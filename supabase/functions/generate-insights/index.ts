@@ -157,16 +157,16 @@ Deno.serve(async (req) => {
 
   try {
     console.log('Starting generate-insights function...');
-    
+
     const requestData = await req.json();
     console.log('Received request data:', {
       tenantsCount: requestData.tenants?.length,
       userId: requestData.user_id,
-      firstTenant: requestData.tenants?.[0] // Log first tenant as sample
+      firstTenant: requestData.tenants?.[0]
     });
-    
+
     const { tenants, user_id } = requestData;
-    
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -185,12 +185,11 @@ Deno.serve(async (req) => {
     }
     console.log('Created new report:', newReport);
 
-    console.log('Calling Lambda API...');
-    const lambdaPayload = { json: tenants, count: tenants.length };
-    console.log('Lambda payload:', lambdaPayload);
+    console.log('Submitting tenant data to Lambda async job...');
+    const lambdaPayload = { tenants, user_id };
 
-    const lambdaResponse = await fetch(
-      'https://zv54onyhgk.execute-api.us-west-1.amazonaws.com/prod/insight',
+    const submitResponse = await fetch(
+      'https://your-api/submit',
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -198,41 +197,29 @@ Deno.serve(async (req) => {
       }
     );
 
-    console.log('Lambda response status:', lambdaResponse.status);
-    if (!lambdaResponse.ok) {
-      console.error('Lambda API error:', lambdaResponse.status);
-      const errorText = await lambdaResponse.text();
-      console.error('Lambda error details:', errorText);
-      throw new Error(`Lambda API error: ${lambdaResponse.status}`);
+    if (!submitResponse.ok) {
+      const errorText = await submitResponse.text();
+      console.error('Submit API error:', errorText);
+      throw new Error(`Submit API failed: ${submitResponse.status}`);
     }
 
-    const rawLambdaResponse = await lambdaResponse.json();
-    console.log('Raw Lambda response:', rawLambdaResponse);
+    const { job_id } = await submitResponse.json();
+    console.log('Received job_id:', job_id);
 
     let insightData;
-    if (Array.isArray(rawLambdaResponse)) {
-      console.log('Lambda response is direct array');
-      insightData = rawLambdaResponse;
-    } else if (rawLambdaResponse.body && Array.isArray(rawLambdaResponse.body)) {
-      console.log('Lambda response has body array');
-      insightData = rawLambdaResponse.body;
-    } else if (typeof rawLambdaResponse.body === 'string') {
-      console.log('Lambda response body is string, attempting to parse');
-      try {
-        const parsedBody = JSON.parse(rawLambdaResponse.body);
-        insightData = Array.isArray(parsedBody) ? parsedBody : parsedBody.body;
-      } catch (e) {
-        console.error('Failed to parse Lambda response body:', e);
-        throw new Error('Invalid response format from Lambda function');
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const resultRes = await fetch(`https://your-api/results?job_id=${job_id}`);
+      const result = await resultRes.json();
+
+      if (Array.isArray(result)) {
+        insightData = result;
+        break;
       }
-    } else {
-      console.error('Invalid Lambda response format:', rawLambdaResponse);
-      throw new Error('Invalid response format from Lambda function');
+      await new Promise(res => setTimeout(res, 3000));
     }
 
-    if (!Array.isArray(insightData)) {
-      console.error('Lambda did not return array:', insightData);
-      throw new Error('Lambda function did not return an array of insights');
+    if (!insightData) {
+      throw new Error('Insight generation timed out');
     }
 
     console.log('Processing insights:', {
@@ -240,8 +227,8 @@ Deno.serve(async (req) => {
       sample: insightData[0]
     });
 
-    const insights = insightData.map((item: any) => {
-      const tenantData = tenants.find((t: any) => 
+    const insights = insightData.map((item) => {
+      const tenantData = tenants.find((t) => 
         t.property === item.property && 
         t.unit === (item.unit || 'Unknown') && 
         t.tenant === item.tenant_name
