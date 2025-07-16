@@ -247,9 +247,17 @@ Deno.serve(async (req) => {
       throw new Error('Unexpected response format from Lambda function');
     }
 
+    // Ensure insightData is always an array
     if (!Array.isArray(insightData)) {
-      console.error('Insight data is not an array:', insightData);
-      throw new Error('Lambda function did not return an array of insights');
+      console.log('Converting single insight object to array:', insightData);
+      // Check if it's a single insight object with expected properties
+      if (insightData && typeof insightData === 'object' && 
+          (insightData.tenant_name || insightData.tenant_score !== undefined)) {
+        insightData = [insightData];
+      } else {
+        console.error('Insight data is not an array and not a valid insight object:', insightData);
+        throw new Error('Lambda function did not return valid insight data');
+      }
     }
 
     console.log('Processing insights:', {
