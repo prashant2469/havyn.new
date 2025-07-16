@@ -185,41 +185,71 @@ Deno.serve(async (req) => {
     }
     console.log('Created new report:', newReport);
 
-    console.log('Submitting tenant data to Lambda async job...');
+    console.log('Calling AWS Lambda function for tenant insights...');
     const lambdaPayload = { tenants, user_id };
 
-    const submitResponse = await fetch(
-      'https://your-api/submit',
+    // Use the correct AWS Lambda endpoint
+    const lambdaResponse = await fetch(
+      'https://zv54onyhgk.execute-api.us-west-1.amazonaws.com/prod/insight',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify(lambdaPayload)
       }
     );
 
-    if (!submitResponse.ok) {
-      const errorText = await submitResponse.text();
-      console.error('Submit API error:', errorText);
-      throw new Error(`Submit API failed: ${submitResponse.status}`);
+    console.log('Lambda response status:', lambdaResponse.status);
+    
+    if (!lambdaResponse.ok) {
+      const errorText = await lambdaResponse.text();
+      console.error('Lambda API error:', errorText);
+      throw new Error(`Lambda API failed with status ${lambdaResponse.status}: ${errorText}`);
     }
 
-    const { job_id } = await submitResponse.json();
-    console.log('Received job_id:', job_id);
+    const rawLambdaResponse = await lambdaResponse.json();
+    console.log('Raw Lambda response received:', {
+      type: typeof rawLambdaResponse,
+      isArray: Array.isArray(rawLambdaResponse),
+      hasBody: 'body' in rawLambdaResponse,
+      statusCode: rawLambdaResponse.statusCode
+    });
 
+    // Handle different response formats from Lambda
     let insightData;
-    for (let attempt = 0; attempt < 20; attempt++) {
-      const resultRes = await fetch(`https://your-api/results?job_id=${job_id}`);
-      const result = await resultRes.json();
-
-      if (Array.isArray(result)) {
-        insightData = result;
-        break;
+    if (Array.isArray(rawLambdaResponse)) {
+      // Direct array response
+      insightData = rawLambdaResponse;
+    } else if (rawLambdaResponse.body) {
+      // Response wrapped in body property
+      if (typeof rawLambdaResponse.body === 'string') {
+        try {
+          insightData = JSON.parse(rawLambdaResponse.body);
+        } catch (parseError) {
+          console.error('Failed to parse Lambda response body:', parseError);
+          throw new Error('Invalid JSON in Lambda response body');
+        }
+      } else {
+        insightData = rawLambdaResponse.body;
       }
-      await new Promise(res => setTimeout(res, 3000));
+    } else if (rawLambdaResponse.statusCode === 200) {
+      // Check if the response itself contains the data
+      const { statusCode, ...responseData } = rawLambdaResponse;
+      if (Object.keys(responseData).length > 0) {
+        insightData = [responseData]; // Wrap single object in array
+      } else {
+        throw new Error('Lambda response contains no data');
+      }
+    } else {
+      console.error('Unexpected Lambda response format:', rawLambdaResponse);
+      throw new Error('Unexpected response format from Lambda function');
     }
 
-    if (!insightData) {
-      throw new Error('Insight generation timed out');
+    if (!Array.isArray(insightData)) {
+      console.error('Insight data is not an array:', insightData);
+      throw new Error('Lambda function did not return an array of insights');
     }
 
     console.log('Processing insights:', {
