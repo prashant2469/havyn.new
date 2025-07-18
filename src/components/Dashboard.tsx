@@ -471,7 +471,7 @@ export function Dashboard() {
   };
 
   const calculateOverallStats = () => {
-    if (!insights.length) return null;
+    if (!insights || !Array.isArray(insights) || !insights.length) return null;
 
     const totalRevenue = insights.reduce((sum, insight) => sum + insight.rent_amount, 0);
     const averageRent = totalRevenue / insights.length;
