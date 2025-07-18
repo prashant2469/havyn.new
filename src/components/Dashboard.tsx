@@ -471,13 +471,16 @@ export function Dashboard() {
   };
 
   const calculateOverallStats = () => {
-    if (!insights || !Array.isArray(insights) || !insights.length) return null;
+    // Ensure insights is always treated as an array
+    const insightsArray = Array.isArray(insights) ? insights : [];
+    
+    if (!insightsArray.length) return null;
 
-    const totalRevenue = insights.reduce((sum, insight) => sum + insight.rent_amount, 0);
-    const averageRent = totalRevenue / insights.length;
+    const totalRevenue = insightsArray.reduce((sum, insight) => sum + insight.rent_amount, 0);
+    const averageRent = totalRevenue / insightsArray.length;
 
-    const delinquentCount = insights.filter(i => i.delinquent_rent > 0).length;
-    const upcomingLeases = insights.filter(i => {
+    const delinquentCount = insightsArray.filter(i => i.delinquent_rent > 0).length;
+    const upcomingLeases = insightsArray.filter(i => {
       if (!i.lease_end_date) return false;
       const leaseEnd = new Date(i.lease_end_date);
       const thirtyDaysFromNow = new Date();
@@ -497,7 +500,7 @@ export function Dashboard() {
       high: 0
     };
 
-    insights.forEach(insight => {
+    insightsArray.forEach(insight => {
       const turnoverRisk = insight.turnover_risk.toLowerCase() as 'low' | 'medium' | 'high';
       turnoverRisks[turnoverRisk]++;
 
@@ -508,16 +511,16 @@ export function Dashboard() {
     return {
       turnoverRisks,
       delinquencyRisks,
-      totalUnits: insights.length,
+      totalUnits: insightsArray.length,
       totalRevenue,
       averageRent,
       delinquentCount,
       upcomingLeases,
-      highRiskCount: insights.filter(i => i.turnover_risk.toLowerCase() === 'high').length,
-      retentionNeeded: insights.filter(i => i.retention_outreach_needed).length,
-      rentIncreaseOpportunities: insights.filter(i => i.raise_rent_opportunity).length,
+      highRiskCount: insightsArray.filter(i => i.turnover_risk.toLowerCase() === 'high').length,
+      retentionNeeded: insightsArray.filter(i => i.retention_outreach_needed).length,
+      rentIncreaseOpportunities: insightsArray.filter(i => i.raise_rent_opportunity).length,
       averageScore: Math.round(
-        insights.reduce((sum, insight) => sum + insight.score, 0) / insights.length
+        insightsArray.reduce((sum, insight) => sum + insight.score, 0) / insightsArray.length
       )
     };
   };
