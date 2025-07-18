@@ -670,7 +670,7 @@ export function Dashboard() {
             </div>
             <div className="flex gap-4">
               <button
-                onClick={c}
+                onClick={mergeFiles}
                 disabled={loading || (!files.combined && !allFilesUploaded)}
                 className="px-6 py-2 bg-[#3F6B28] text-white rounded-lg hover:bg-[#345A22] disabled:opacity-50 disabled:hover:bg-[#3F6B28] flex items-center gap-2 transition-colors"
               >
