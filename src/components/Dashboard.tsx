@@ -588,7 +588,7 @@ export function Dashboard() {
   };
 
   const stats = calculateOverallStats();
-  const propertyGroups = insights.reduce((groups: { [key: string]: TenantInsight[] }, insight) => {
+  const propertyGroups = (Array.isArray(insights) ? insights : []).reduce((groups: { [key: string]: TenantInsight[] }, insight) => {
     if (!groups[insight.property]) {
       groups[insight.property] = [];
     }
