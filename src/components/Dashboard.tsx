@@ -487,7 +487,7 @@ export function Dashboard() {
       console.log('Starting Generate Insights flow...');
       
       // 1. Generate a unique job_id
-      const job_id = crypto.randomUUID();
+      let job_id = crypto.randomUUID();
   
       setDebugData({
         allTenants: mergedData,
