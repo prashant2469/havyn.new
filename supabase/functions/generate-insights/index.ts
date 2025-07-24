@@ -364,8 +364,8 @@ const corsHeaders = {
 };
 
 // ▲ YOUR API endpoints here ▼
-const INSIGHT_API_URL    = 'https://<api‑id>.execute-api.us-west-1.amazonaws.com/prod/insight';
-const GET_RESULTS_URL    = 'https://<api‑id>.execute-api.us-west-1.amazonaws.com/prod/get_results';
+const INSIGHT_API_URL    = 'https://zv54onyhgk.execute-api.us‑west‑1.amazonaws.com/prod/insight';
+const GET_RESULTS_URL    = 'https://zv54onyhgk.execute-api.us‑west‑1.amazonaws.com/prod/get_results';
 // ▲▲▲ Replace those with your real invoke URLs ▲▲▲
 
 /**
