@@ -22,6 +22,26 @@ type SortOrder = 'asc' | 'desc';
 
 type DelinquencySortField = 'tenant' | 'property' | 'amount' | 'aging';
 
+// POLLING HELP
+async function pollForResults(jobId, maxAttempts = 30, intervalMs = 2000) {
+  const getResultUrl = `${supabase.supabaseUrl}/functions/v1/get_result?job_id=${jobId}`;
+  let attempts = 0;
+  while (attempts < maxAttempts) {
+    const res = await fetch(getResultUrl, {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${supabase.supabaseKey}`
+      }
+    });
+    if (res.status === 200) return await res.json();
+    if (res.status !== 202) throw new Error(`Polling failed: ${res.status}`);
+    await new Promise(r => setTimeout(r, intervalMs));
+    attempts++;
+  }
+  throw new Error('Polling timed out');
+}
+//POLLING HELP
+
 export function Dashboard() {
   const { user } = useAuth();
   const [files, setFiles] = useState<{ [key: string]: File }>({});
@@ -369,6 +389,7 @@ export function Dashboard() {
     }
   };
 
+  /*
   const generateInsights = async () => {
     if (!mergedData.length) {
       setError('Please merge files first');
@@ -437,7 +458,86 @@ export function Dashboard() {
       setIsGenerating(false);
     }
   };
-
+*/
+  // NEW
+  const generateInsights = async () => {
+    if (!mergedData.length) {
+      setError('Please merge files first');
+      return;
+    }
+    if (!user) {
+      setError('Please log in to generate insights');
+      return;
+    }
+  
+    setIsGenerating(true);
+    setError(null);
+    setShowSavedInsights(false);
+    setShowUploadSection(false);
+    setShowPreview(false);
+    setGeneratingProgress(0);
+  
+    try {
+      // 1. Generate a unique job_id
+      const job_id = crypto.randomUUID();
+  
+      setDebugData({
+        allTenants: mergedData,
+        sampledTenants: mergedData
+      });
+  
+      const requestBody = { 
+        tenants: mergedData,
+        user_id: user.id,
+        job_id // Add job_id to request!
+      };
+      setRequestData(JSON.stringify(requestBody, null, 2));
+  
+      // 2. POST to generate-insights
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/generate-insights`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.supabaseKey}`
+        },
+        body: JSON.stringify(requestBody),
+      });
+  
+      // 3. Handle 202 response and extract job_id (may be in body or rawLambdaResponse)
+      let jobIdToPoll = job_id; // fallback
+      if (response.status === 202 || response.status === 200) {
+        const respData = await response.json();
+        // Try to extract job_id if it is sent from backend (for forward compatibility)
+        if (respData.job_id) jobIdToPoll = respData.job_id;
+        else if (respData.body) {
+          const b = typeof respData.body === 'string' ? JSON.parse(respData.body) : respData.body;
+          if (b.job_id) jobIdToPoll = b.job_id;
+        }
+      } else {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+  
+      setGeneratingProgress(10);
+  
+      // 4. Poll for completion
+      const results = await pollForResults(jobIdToPoll);
+      setGeneratingProgress(100);
+  
+      setTimeout(() => {
+        setInsights(results);
+        setGeneratingProgress(0);
+        setRequestData(null);
+        setIsGenerating(false);
+      }, 500);
+    } catch (error) {
+      console.error('Error generating insights:', error);
+      setError(error instanceof Error ? error.message : 'Error generating insights');
+      setInsights([]);
+      setIsGenerating(false);
+    }
+  };
+  // NEW
+  
   const showUploadView = () => {
     setShowUploadSection(true);
     setShowSavedInsights(false);
