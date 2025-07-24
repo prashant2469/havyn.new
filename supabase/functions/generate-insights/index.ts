@@ -6,6 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// API configuration
+const API_BASE_URL = 'https://qicbherqdoimeowmkuti.supabase.co/functions/v1/generate-insights';
+
 interface TenantInsight {
   id?: string;
   tenant_name: string;
@@ -179,39 +182,38 @@ Deno.serve(async (req) => {
     }
     console.log('Created new report:', newReport);
 
-    // Get the insights API URL from environment variable
-    const insightsApiUrl = Deno.env.get('INSIGHTS_API_URL') || 'https://qicbherqdoimeowmkuti.supabase.co/functions/v1/generate-insights';
+    console.log('Starting insights generation with polling...');
     
-    // Use the polling approach from the JavaScript snippet
-    console.log('Starting polling-based insights generation...');
-    
-    // 1️⃣ Kick off a new insights job
+    // 1️⃣ POST action: Start the job
     const postRes = await fetch(
-      insightsApiUrl,
+      API_BASE_URL,
       {
         method: "POST",
         headers: apiHeaders,
         body: JSON.stringify({
-          tenants: tenants,
-          user_id: user_id
+          tenants,
+          user_id
         }),
       }
     );
     
     if (!postRes.ok) {
+      const errorText = await postRes.text();
+      console.error('POST request failed:', postRes.status, errorText);
       throw new Error(`Failed to start job: ${postRes.status}`);
     }
     
     const { job_id: actualJobId } = await postRes.json();
     console.log('Started job with ID:', actualJobId);
 
-    // 2️⃣ Poll for results until ready
-    const timeout = Date.now() + 60_000;   // give up after 60s
+    // 2️⃣ GET action with polling: Poll for results until ready
+    const timeout = Date.now() + 60000;   // 60 second timeout
     let insightData = [];
     
     while (Date.now() < timeout) {
+      console.log('Polling for results...');
       const getRes = await fetch(
-        `${insightsApiUrl}?job_id=${encodeURIComponent(actualJobId)}`,
+        `${API_BASE_URL}?job_id=${encodeURIComponent(actualJobId)}`,
         {
           method: "GET",
           headers: apiHeaders
@@ -219,7 +221,7 @@ Deno.serve(async (req) => {
       );
       
       if (getRes.status === 200) {
-        // 🎉 Success – get the real insights array
+        // 🎉 Success – return the full JSON array as insights
         insightData = await getRes.json();
         console.log('Received insights from polling:', { count: insightData.length });
         break;
@@ -227,11 +229,12 @@ Deno.serve(async (req) => {
       
       if (getRes.status !== 202) {
         const err = await getRes.text();
+        console.error('Polling error:', getRes.status, err);
         throw new Error(`Error fetching results: ${getRes.status} – ${err}`);
       }
       
-      // still processing → wait 2s and try again
-      console.log('Job still processing, waiting 2s...');
+      // HTTP 202: still processing → wait 2000ms and try again
+      console.log('Job still processing (202), waiting 2000ms...');
       await new Promise(r => setTimeout(r, 2000));
     }
     
