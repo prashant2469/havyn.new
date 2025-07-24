@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // API configuration
-const API_BASE_URL = 'https://qicbherqdoimeowmkuti.supabase.co/functions/v1/generate-insights';
+const API_BASE_URL = 'https://api.openai.com/v1/chat/completions';
 
 interface TenantInsight {
   id?: string;
