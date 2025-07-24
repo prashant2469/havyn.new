@@ -355,7 +355,9 @@ Deno.serve(async (req) => {
   }
 });
 */
-import { createClient } from '@supabase/supabase-js';
+
+
+//import { createClient } from '@supabase/supabase-js';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -364,8 +366,8 @@ const corsHeaders = {
 };
 
 // ▲ YOUR API endpoints here ▼
-const INSIGHT_API_URL    = 'https://zv54onyhgk.execute-api.us‑west‑1.amazonaws.com/prod/insight';
-const GET_RESULTS_URL    = 'https://zv54onyhgk.execute-api.us‑west‑1.amazonaws.com/prod/get_results';
+const INSIGHT_API_URL    = 'https://zv54onyhgk.execute-api.us‑west-1.amazonaws.com/prod/insight';
+const GET_RESULTS_URL    = 'https://zv54onyhgk.execute-api.us‑west-1.amazonaws.com/prod/get_results';
 // ▲▲▲ Replace those with your real invoke URLs ▲▲▲
 
 /**
