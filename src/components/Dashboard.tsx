@@ -548,7 +548,7 @@ export function Dashboard() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
   
-      const { job_id } = await response.json();
+      ({ job_id } = await response.json());
       console.log('Job started with ID:', job_id);
       
       if (!job_id) {
