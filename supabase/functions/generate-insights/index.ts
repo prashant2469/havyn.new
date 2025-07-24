@@ -274,7 +274,7 @@ Deno.serve(async (req) => {
       );
 
       return {
-        tenant_name: item.tenant_name,
+        tenant_name: item.tenant_name || '',
         score: item.tenant_score,
         renewal_recommendation: item.renewal_recommendation,
         turnover_risk: item.turnover_risk,
