@@ -478,6 +478,8 @@ export function Dashboard() {
     setGeneratingProgress(0);
   
     try {
+      console.log('Starting Generate Insights flow...');
+      
       // 1. Generate a unique job_id
       const job_id = crypto.randomUUID();
   
@@ -485,14 +487,34 @@ export function Dashboard() {
         allTenants: mergedData,
         sampledTenants: mergedData
       });
+
+      // Prepare tenant data for API
+      const tenantData = mergedData.map(tenant => ({
+        property: tenant.property,
+        unit: tenant.unit,
+        tenant: tenant.tenant,
+        rentAmount: tenant.rentAmount,
+        pastDue: tenant.pastDue,
+        delinquentRent: tenant.delinquentRent,
+        aging30: tenant.aging30,
+        aging60: tenant.aging60,
+        aging90: tenant.aging90,
+        agingOver90: tenant.agingOver90,
+        delinquencyNotes: tenant.delinquencyNotes,
+        moveInDate: tenant.moveInDate,
+        leaseEndDate: tenant.leaseEndDate,
+        phoneNumbers: tenant.phoneNumbers,
+        emails: tenant.emails
+      }));
   
       const requestBody = { 
-        tenants: mergedData,
+        tenants: tenantData,
         user_id: user.id,
         job_id // Add job_id to request!
       };
       setRequestData(JSON.stringify(requestBody, null, 2));
   
+      console.log('Calling generate-insights edge function...');
       // 2. POST to generate-insights
       const response = await fetch(`${supabase.supabaseUrl}/functions/v1/generate-insights`, {
         method: 'POST',
@@ -514,6 +536,8 @@ export function Dashboard() {
           if (b.job_id) jobIdToPoll = b.job_id;
         }
       } else {
+        const errorText = await response.text();
+        console.error('Edge function error:', response.status, errorText);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
   
@@ -521,16 +545,23 @@ export function Dashboard() {
   
       // 4. Poll for completion
       const results = await pollForResults(jobIdToPoll);
+      console.log('Received insights:', { count: results?.length });
       setGeneratingProgress(100);
   
       setTimeout(() => {
-        setInsights(results);
+        if (Array.isArray(results)) {
+          setInsights(results);
+          console.log('Successfully generated insights');
+        } else {
+          console.error('Invalid insights format:', results);
+          throw new Error('Invalid response format');
+        }
         setGeneratingProgress(0);
         setRequestData(null);
         setIsGenerating(false);
       }, 500);
     } catch (error) {
-      console.error('Error generating insights:', error);
+      console.error('Generate insights error:', error);
       setError(error instanceof Error ? error.message : 'Error generating insights');
       setInsights([]);
       setIsGenerating(false);
