@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
     
     // 1️⃣ Kick off a new insights job
     const postRes = await fetch(
-      Deno.env.get('INSIGHTS_API_URL') ?? '',
+      'https://qicbherqdoimeowmkuti.supabase.co/functions/v1/generate-insights',
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -195,7 +195,7 @@ Deno.serve(async (req) => {
     
     while (Date.now() < timeout) {
       const getRes = await fetch(
-        `${Deno.env.get('INSIGHTS_API_URL')}?job_id=${encodeURIComponent(actualJobId)}`
+        `https://qicbherqdoimeowmkuti.supabase.co/functions/v1/generate-insights?job_id=${encodeURIComponent(actualJobId)}`
       );
       
       if (getRes.status === 200) {
