@@ -166,12 +166,15 @@ Deno.serve(async (req) => {
     }
     console.log('Created new report:', newReport);
 
+    // Get the insights API URL from environment variable
+    const insightsApiUrl = Deno.env.get('INSIGHTS_API_URL') || 'https://qicbherqdoimeowmkuti.supabase.co/functions/v1/generate-insights';
+    
     // Use the polling approach from the JavaScript snippet
     console.log('Starting polling-based insights generation...');
     
     // 1️⃣ Kick off a new insights job
     const postRes = await fetch(
-      'https://qicbherqdoimeowmkuti.supabase.co/functions/v1/generate-insights',
+      insightsApiUrl,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -195,7 +198,7 @@ Deno.serve(async (req) => {
     
     while (Date.now() < timeout) {
       const getRes = await fetch(
-        `https://qicbherqdoimeowmkuti.supabase.co/functions/v1/generate-insights?job_id=${encodeURIComponent(actualJobId)}`
+        `${insightsApiUrl}?job_id=${encodeURIComponent(actualJobId)}`
       );
       
       if (getRes.status === 200) {
