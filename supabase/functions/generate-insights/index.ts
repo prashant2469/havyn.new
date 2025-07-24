@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
     
     // 1️⃣ Kick off a new insights job
     const postRes = await fetch(
-      "https://zp1v56uxy8rdx5ypatb0ockcb9tr6a-oci3--5173--96435430.local-credentialless.webcontainer-api.io",
+      Deno.env.get('INSIGHTS_API_URL') ?? '',
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -195,7 +195,7 @@ Deno.serve(async (req) => {
     
     while (Date.now() < timeout) {
       const getRes = await fetch(
-        `https://zp1v56uxy8rdx5ypatb0ockcb9tr6a-oci3--5173--96435430.local-credentialless.webcontainer-api.io?job_id=${encodeURIComponent(actualJobId)}`
+        `${Deno.env.get('INSIGHTS_API_URL')}?job_id=${encodeURIComponent(actualJobId)}`
       );
       
       if (getRes.status === 200) {
