@@ -33,8 +33,8 @@ interface TenantInsight {
   lease_end_date: string | null;
   total_balance: number;
   delinquency_notes: string | null;
-  "Phone Number": string | null;
-  "Emails": string | null;
+  email: string | null;
+  phone_number: string | null;
   changes?: {
     score?: { old: number; new: number };
     turnover_risk?: { old: string; new: string };
@@ -299,8 +299,8 @@ Deno.serve(async (req) => {
         lease_end_date: tenantData?.leaseEndDate || null,
         total_balance: (tenantData?.pastDue || 0) + (tenantData?.delinquentRent || 0),
         delinquency_notes: tenantData?.delinquencyNotes || null,
-        "Phone Number": tenantData?.phoneNumbers || null,
-        "Emails": tenantData?.emails || null,
+        phone_number: tenantData?.phoneNumbers || null,
+        email: tenantData?.emails || null,
         report_id: newReport.id,
         previous_insight_id: null,
         changes: undefined

@@ -277,8 +277,8 @@ export function InsightCard({ insight, allInsights = [] }: InsightCardProps) {
             <MessageTenantButton
               tenantName={insight.tenant_name}
               tenantId={insight.id}
-              phoneNumber={insight["Phone Number"]}
-              email={insight["Emails"]}
+              phoneNumber={insight.phone_number}
+              email={insight.email}
               isDelinquent={insight.high_delinquency_alert}
               leaseEndingSoon={insight.lease_end_date && new Date(insight.lease_end_date) <= thirtyDaysFromNow}
             />

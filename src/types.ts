@@ -76,4 +76,6 @@ export interface TenantInsight {
   };
   report_id?: string;
   previous_insight_id?: string | null;
+  email?: string;
+  phone_number?: string;
 }
