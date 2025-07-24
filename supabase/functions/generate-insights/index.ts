@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
       firstTenant: requestData.tenants?.[0]
     });
 
-    const { tenants, user_id } = requestData;
+    const { tenants, user_id, job_id } = requestData;
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
