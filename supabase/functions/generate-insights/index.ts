@@ -150,7 +150,7 @@ async function updateInsightWithHistory(
   }
 }
 
-/*
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -354,9 +354,9 @@ Deno.serve(async (req) => {
     );
   }
 });
-*/
 
 
+/*
 //import { createClient } from '@supabase/supabase-js';
 
 const corsHeaders = {
@@ -373,7 +373,7 @@ const GET_RESULTS_URL    = 'https://zv54onyhgk.execute-api.us‑west-1.amazonaws
 /**
  * 1️⃣ Send the job to your POST /insight endpoint.
  *    Expects a 202 + { job_id } response.
- */
+ 
 async function submitJob(
   payload: { tenants: any[]; user_id: string }
 ): Promise<string> {
@@ -394,7 +394,7 @@ async function submitJob(
 
 /**
  * 2️⃣ Poll GET /get_results?job_id=… until it returns 200 with the insights array.
- */
+ 
 async function pollForResults(
   jobId: string,
   intervalMs = 1000,
@@ -425,7 +425,7 @@ async function pollForResults(
 
 /**
  * 3️⃣ Your main HTTP handler.
- */
+ 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -467,3 +467,4 @@ Deno.serve(async (req) => {
     );
   }
 });
+*/
