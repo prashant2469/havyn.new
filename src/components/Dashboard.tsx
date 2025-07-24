@@ -30,7 +30,7 @@ async function pollForResults(jobId, maxAttempts = 30, intervalMs = 2000) {
     const res = await fetch(getResultUrl, {
       headers: {
         Accept: 'application/json',
-        Authorization: `Bearer ${supabase.supabaseKey}`
+        Authorization: `Bearer ${accessToken}`
       }
     });
     if (res.status === 200) return await res.json();
@@ -570,7 +570,7 @@ export function Dashboard() {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabase.supabaseKey}`
+              'Authorization': `Bearer ${session.access_token}`
             }
           }
         );
@@ -602,8 +602,10 @@ export function Dashboard() {
       
       console.log('=== INSIGHTS GENERATION COMPLETE ===');
       setInsights(insights);
-      // 4. Poll for completion
-      const results = await pollForResults(jobIdToPoll);
+      setGeneratingProgress(10);
+  
+      // 4. Poll for completion, also with user token!
+      const results = await pollForResults(jobIdToPoll, session.access_token);
       console.log('Received insights:', { count: results?.length });
       setGeneratingProgress(100);
   
