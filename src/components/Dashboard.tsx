@@ -193,6 +193,7 @@ export function Dashboard() {
       console.log('Preview data:', previewData);
       console.log('User ID:', user.id);
 
+      // Step 1: POST to start the job
       const response = await fetch(`${supabase.supabaseUrl}/functions/v1/generate-insights`, {
         method: 'POST',
         headers: {
@@ -213,33 +214,27 @@ export function Dashboard() {
         throw new Error(`Failed to start insight generation: ${response.status}`);
       }
 
-      let job_id = crypto.randomUUID();
-      
-      try {
-        ({ job_id } = await response.json());
-        console.log('Job started with ID:', job_id);
+      const { job_id } = await response.json();
+      console.log('Job started with ID:', job_id);
 
-        if (!job_id) {
-          throw new Error('No job ID received from server');
-        }
-      } catch (parseError) {
-        console.error('Error parsing initial response:', parseError);
-        throw new Error('Invalid response from server');
+      if (!job_id) {
+        throw new Error('No job ID received from server');
       }
 
+      // Step 2: Poll GET endpoint until completion
       console.log('Starting polling for job:', job_id);
       
-      const pollForResults = async (): Promise<TenantInsight[]> => {
-        const maxAttempts = 60;
+      const pollForResults = async (jobId: string): Promise<TenantInsight[]> => {
+        const maxAttempts = 30; // 30 attempts * 2 seconds = 60 seconds timeout
         let attempts = 0;
 
         while (attempts < maxAttempts) {
           attempts++;
-          console.log(`Polling attempt ${attempts}/${maxAttempts} for job ${job_id}`);
+          console.log(`Polling attempt ${attempts}/${maxAttempts} for job ${jobId}`);
 
           try {
             const pollResponse = await fetch(
-              `${supabase.supabaseUrl}/functions/v1/generate-insights?job_id=${encodeURIComponent(job_id)}`,
+              `${supabase.supabaseUrl}/functions/v1/generate-insights?job_id=${encodeURIComponent(jobId)}`,
               {
                 method: 'GET',
                 headers: {
@@ -259,7 +254,7 @@ export function Dashboard() {
             } else if (pollResponse.status === 202) {
               console.log('Job still processing, waiting...');
               setGeneratingProgress(prev => Math.min(prev + 2, 95));
-              await new Promise(resolve => setTimeout(resolve, 3000));
+              await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second interval
               continue;
             } else {
               const errorText = await pollResponse.text();
@@ -271,14 +266,14 @@ export function Dashboard() {
             if (attempts >= maxAttempts) {
               throw pollError;
             }
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            await new Promise(resolve => setTimeout(resolve, 2000));
           }
         }
 
-        throw new Error('Insight generation timed out after 3 minutes');
+        throw new Error('Insight generation timed out after 60 seconds');
       };
 
-      const results = await pollForResults();
+      const results = await pollForResults(job_id);
       
       if (!Array.isArray(results) || results.length === 0) {
         throw new Error('No insights were generated');
@@ -298,6 +293,8 @@ export function Dashboard() {
     } catch (err) {
       console.error('Error generating insights:', err);
       setError(err instanceof Error ? err.message : 'Failed to generate insights');
+      setIsGenerating(false);
+      setGeneratingProgress(0);
     } finally {
       setLoading(false);
     }
