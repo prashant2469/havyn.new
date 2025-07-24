@@ -48,25 +48,6 @@ interface TenantInsight {
   created_at?: string;
 }
 
-interface LambdaResponse {
-  statusCode: number;
-  body: Array<{
-    tenant_name: string;
-    tenant_score: number;
-    renewal_recommendation: string;
-    turnover_risk: string;
-    predicted_delinquency: string;
-    raise_rent_opportunity: boolean;
-    retention_outreach_needed: boolean;
-    high_delinquency_alert: boolean;
-    notes_analysis: string;
-    recommended_actions: string[];
-    property: string;
-    unit: string;
-    reasoning_summary: string;
-  }>;
-}
-
 function compareInsights(existing: TenantInsight, newInsight: TenantInsight): TenantInsight['changes'] {
   const changes: TenantInsight['changes'] = {};
 
@@ -150,7 +131,6 @@ async function updateInsightWithHistory(
   }
 }
 
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -186,98 +166,74 @@ Deno.serve(async (req) => {
     }
     console.log('Created new report:', newReport);
 
-    console.log('Calling AWS Lambda function for tenant insights...');
-    const lambdaPayload = { tenants, user_id, job_id };
-
-    // Use the correct AWS Lambda endpoint
-    const lambdaResponse = await fetch(
-      'https://zv54onyhgk.execute-api.us-west-1.amazonaws.com/prod/insight',
-      {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(lambdaPayload)
-      }
-    );
-
-    console.log('Lambda response status:', lambdaResponse.status);
+    // Use the polling approach from the JavaScript snippet
+    console.log('Starting polling-based insights generation...');
     
-    if (!lambdaResponse.ok) {
-      const errorText = await lambdaResponse.text();
-      console.error('Lambda API error:', errorText);
-      throw new Error(`Lambda API failed with status ${lambdaResponse.status}: ${errorText}`);
-    }
-
-    const rawLambdaResponse = await lambdaResponse.json();
-    console.log('Raw Lambda response received:', {
-      type: typeof rawLambdaResponse,
-      isArray: Array.isArray(rawLambdaResponse),
-      hasBody: 'body' in rawLambdaResponse,
-      statusCode: rawLambdaResponse.statusCode
-    });
-
-    // For testing: return raw Lambda response to frontend
-    return new Response(
-      JSON.stringify({
-        debug: true,
-        rawLambdaResponse: rawLambdaResponse,
-        requestPayload: lambdaPayload
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    // 1️⃣ Kick off a new insights job
+    const postRes = await fetch(
+      "https://zp1v56uxy8rdx5ypatb0ockcb9tr6a-oci3--5173--96435430.local-credentialless.webcontainer-api.io",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tenants: tenants,
+          user_id: user_id
+        }),
+      }
     );
+    
+    if (!postRes.ok) {
+      throw new Error(`Failed to start job: ${postRes.status}`);
+    }
+    
+    const { job_id: actualJobId } = await postRes.json();
+    console.log('Started job with ID:', actualJobId);
 
-    // Handle different response formats from Lambda
-    let insightData;
-    if (Array.isArray(rawLambdaResponse)) {
-      // Direct array response
-      insightData = rawLambdaResponse;
-    } else if (rawLambdaResponse.body) {
-      // Response wrapped in body property
-      if (typeof rawLambdaResponse.body === 'string') {
-        try {
-          insightData = JSON.parse(rawLambdaResponse.body);
-        } catch (parseError) {
-          console.error('Failed to parse Lambda response body:', parseError);
-          console.log('Using empty array due to parse error');
-          insightData = [];
-        }
-      } else {
-        insightData = rawLambdaResponse.body;
+    // 2️⃣ Poll for results until ready
+    const timeout = Date.now() + 60_000;   // give up after 60s
+    let insightData = [];
+    
+    while (Date.now() < timeout) {
+      const getRes = await fetch(
+        `https://zp1v56uxy8rdx5ypatb0ockcb9tr6a-oci3--5173--96435430.local-credentialless.webcontainer-api.io?job_id=${encodeURIComponent(actualJobId)}`
+      );
+      
+      if (getRes.status === 200) {
+        // 🎉 Success – get the real insights array
+        insightData = await getRes.json();
+        console.log('Received insights from polling:', { count: insightData.length });
+        break;
       }
-    } else if (rawLambdaResponse.statusCode === 200) {
-      // Check if the response itself contains the data
-      const { statusCode, ...responseData } = rawLambdaResponse;
-      if (Object.keys(responseData).length > 0) {
-        insightData = [responseData]; // Wrap single object in array
-      } else {
-        console.log('Lambda response contains no data, using empty array');
-        insightData = [];
+      
+      if (getRes.status !== 202) {
+        const err = await getRes.text();
+        throw new Error(`Error fetching results: ${getRes.status} – ${err}`);
       }
-    } else {
-      console.error('Unexpected Lambda response format:', rawLambdaResponse);
-      console.log('Unexpected response format, using empty array');
-      insightData = [];
+      
+      // still processing → wait 2s and try again
+      console.log('Job still processing, waiting 2s...');
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    
+    if (Date.now() >= timeout) {
+      throw new Error("Timed out waiting for insights");
     }
 
     // Ensure insightData is always an array
     if (!Array.isArray(insightData)) {
       console.log('Converting single insight object to array:', insightData);
-      // Check if it's a single insight object with expected properties
       if (insightData && typeof insightData === 'object' && 
           (insightData.tenant_name || insightData.tenant_score !== undefined)) {
         insightData = [insightData];
       } else {
         console.error('Insight data is not an array and not a valid insight object:', insightData);
-        console.log('Using empty array due to invalid insight data');
         insightData = [];
       }
     }
 
     // Handle empty array case
     if (insightData.length === 0) {
-      console.log('No insights returned from Lambda, returning empty array');
+      console.log('No insights returned from polling, returning empty array');
       return new Response(
         JSON.stringify([]),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -368,7 +324,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: error.message,
-        details: 'Failed to process insights from Lambda function'
+        details: 'Failed to process insights from polling endpoint'
       }),
       { 
         status: 500,
@@ -377,5 +333,3 @@ Deno.serve(async (req) => {
     );
   }
 });
-
-
