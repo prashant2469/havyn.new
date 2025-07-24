@@ -153,6 +153,19 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Get Supabase anon key for API calls
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    if (!supabaseAnonKey) {
+      throw new Error('SUPABASE_ANON_KEY environment variable is required');
+    }
+
+    // Headers for API calls
+    const apiHeaders = {
+      'Content-Type': 'application/json',
+      'apikey': supabaseAnonKey,
+      'Authorization': `Bearer ${supabaseAnonKey}`
+    };
+
     console.log('Creating new insight report...');
     const { data: newReport, error: reportError } = await supabase
       .from('insight_reports')
@@ -177,7 +190,7 @@ Deno.serve(async (req) => {
       insightsApiUrl,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: apiHeaders,
         body: JSON.stringify({
           tenants: tenants,
           user_id: user_id
@@ -198,7 +211,11 @@ Deno.serve(async (req) => {
     
     while (Date.now() < timeout) {
       const getRes = await fetch(
-        `${insightsApiUrl}?job_id=${encodeURIComponent(actualJobId)}`
+        `${insightsApiUrl}?job_id=${encodeURIComponent(actualJobId)}`,
+        {
+          method: "GET",
+          headers: apiHeaders
+        }
       );
       
       if (getRes.status === 200) {
