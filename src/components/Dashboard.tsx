@@ -416,7 +416,16 @@ export function Dashboard() {
       const data = await response.json();
       setGeneratingProgress(100);
       setTimeout(() => {
-        setInsights(data);
+        // Check if this is debug data from Lambda
+        if (data.debug && data.rawLambdaResponse) {
+          // Display raw JSON for testing
+          alert('Raw Lambda Response:\n\n' + JSON.stringify(data.rawLambdaResponse, null, 2));
+          console.log('Raw Lambda Response:', data.rawLambdaResponse);
+          console.log('Request Payload:', data.requestPayload);
+          setInsights([]);
+        } else {
+          setInsights(data);
+        }
         setGeneratingProgress(0);
         setRequestData(null);
         setIsGenerating(false);

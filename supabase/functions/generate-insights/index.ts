@@ -218,6 +218,16 @@ Deno.serve(async (req) => {
       statusCode: rawLambdaResponse.statusCode
     });
 
+    // For testing: return raw Lambda response to frontend
+    return new Response(
+      JSON.stringify({
+        debug: true,
+        rawLambdaResponse: rawLambdaResponse,
+        requestPayload: lambdaPayload
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
     // Handle different response formats from Lambda
     let insightData;
     if (Array.isArray(rawLambdaResponse)) {
