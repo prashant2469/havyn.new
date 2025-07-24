@@ -230,7 +230,8 @@ Deno.serve(async (req) => {
           insightData = JSON.parse(rawLambdaResponse.body);
         } catch (parseError) {
           console.error('Failed to parse Lambda response body:', parseError);
-          throw new Error('Invalid JSON in Lambda response body');
+          console.log('Using empty array due to parse error');
+          insightData = [];
         }
       } else {
         insightData = rawLambdaResponse.body;
@@ -241,11 +242,13 @@ Deno.serve(async (req) => {
       if (Object.keys(responseData).length > 0) {
         insightData = [responseData]; // Wrap single object in array
       } else {
-        throw new Error('Lambda response contains no data');
+        console.log('Lambda response contains no data, using empty array');
+        insightData = [];
       }
     } else {
       console.error('Unexpected Lambda response format:', rawLambdaResponse);
-      throw new Error('Unexpected response format from Lambda function');
+      console.log('Unexpected response format, using empty array');
+      insightData = [];
     }
 
     // Ensure insightData is always an array
@@ -257,8 +260,18 @@ Deno.serve(async (req) => {
         insightData = [insightData];
       } else {
         console.error('Insight data is not an array and not a valid insight object:', insightData);
-        throw new Error('Lambda function did not return valid insight data');
+        console.log('Using empty array due to invalid insight data');
+        insightData = [];
       }
+    }
+
+    // Handle empty array case
+    if (insightData.length === 0) {
+      console.log('No insights returned from Lambda, returning empty array');
+      return new Response(
+        JSON.stringify([]),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     console.log('Processing insights:', {
