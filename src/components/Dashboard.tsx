@@ -198,6 +198,9 @@ export function Dashboard() {
 
     setLoading(true);
     setError(null);
+    console.log('=== STARTING INSIGHTS GENERATION ===');
+    console.log('User ID:', user.id);
+    console.log('Data length:', data.length);
     setShowSavedInsights(false);
     setInsights([]);
     setShowPreview(false);
@@ -253,6 +256,7 @@ export function Dashboard() {
     if (!user) return;
 
     try {
+      console.log('=== STEP 1: STARTING JOB (POST) ===');
       console.log('Starting data analysis...');
       
       // Fetch existing tenant insights from database
@@ -430,6 +434,8 @@ export function Dashboard() {
         body: JSON.stringify(requestBody),
       });
 
+      console.log('POST response status:', response.status);
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -537,12 +543,65 @@ export function Dashboard() {
         }
       } else {
         const errorText = await response.text();
+        console.error('POST failed:', errorText);
         console.error('Edge function error:', response.status, errorText);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
   
-      setGeneratingProgress(10);
-  
+      const { job_id } = await response.json();
+      console.log('Job started with ID:', job_id);
+      
+      if (!job_id) {
+        throw new Error('No job_id returned from POST request');
+      }
+
+      console.log('=== STEP 2: POLLING FOR RESULTS (GET) ===');
+      
+      // Start polling for results
+      const timeout = Date.now() + 60000; // 60 second timeout
+      let insights = [];
+      
+      while (Date.now() < timeout) {
+        console.log('Polling for results...');
+        
+        const pollResponse = await fetch(
+          `${supabase.supabaseUrl}/functions/v1/generate-insights?job_id=${encodeURIComponent(job_id)}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabase.supabaseKey}`
+            }
+          }
+        );
+        
+        console.log('GET response status:', pollResponse.status);
+        
+        if (pollResponse.status === 200) {
+          console.log('Job completed! Processing results...');
+          insights = await pollResponse.json();
+          console.log('Received insights:', { count: insights.length });
+          break;
+        }
+        
+        if (pollResponse.status === 202) {
+          console.log('Job still processing, waiting 2 seconds...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          continue;
+        }
+        
+        // Any other status is an error
+        const errorText = await pollResponse.text();
+        console.error('Polling error:', pollResponse.status, errorText);
+        throw new Error(`Polling error: ${pollResponse.status}`);
+      }
+      
+      if (Date.now() >= timeout) {
+        throw new Error('Timeout waiting for insights generation');
+      }
+      
+      console.log('=== INSIGHTS GENERATION COMPLETE ===');
+      setInsights(insights);
       // 4. Poll for completion
       const results = await pollForResults(jobIdToPoll);
       console.log('Received insights:', { count: results?.length });
@@ -562,6 +621,8 @@ export function Dashboard() {
       }, 500);
     } catch (error) {
       console.error('Generate insights error:', error);
+      console.error('=== INSIGHTS GENERATION ERROR ===');
+      console.error('Error:', err);
       setError(error instanceof Error ? error.message : 'Error generating insights');
       setInsights([]);
       setIsGenerating(false);

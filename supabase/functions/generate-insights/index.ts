@@ -140,36 +140,151 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('Starting generate-insights function...');
+    console.log('=== GENERATE INSIGHTS FUNCTION START ===');
+    console.log('Request method:', req.method);
+    console.log('Request URL:', req.url);
+    
+    const url = new URL(req.url);
+    const jobId = url.searchParams.get('job_id');
+    console.log('Job ID from query params:', jobId);
+    
+    // Handle GET request for polling results
+    if (req.method === 'GET' && jobId) {
+      console.log('=== HANDLING GET REQUEST FOR POLLING ===');
+      console.log('Polling for job ID:', jobId);
+      
+      // Get Supabase anon key for API calls
+      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+      if (!supabaseAnonKey) {
+        throw new Error('SUPABASE_ANON_KEY environment variable is required');
+      }
 
-    const requestData = await req.json();
-    console.log('Received request data:', {
-      tenantsCount: requestData.tenants?.length,
-      userId: requestData.user_id,
-      firstTenant: requestData.tenants?.[0]
-    });
+      const apiHeaders = {
+        'Content-Type': 'application/json',
+        'apikey': supabaseAnonKey,
+        'Authorization': `Bearer ${supabaseAnonKey}`
+      };
 
-    const { tenants, user_id } = requestData;
+      console.log('Making GET request to external API...');
+      const getRes = await fetch(
+        `${API_BASE_URL}?job_id=${encodeURIComponent(jobId)}`,
+        {
+          method: "GET",
+          headers: apiHeaders
+        }
+      );
+      
+      console.log('GET response status:', getRes.status);
+      
+      if (getRes.status === 200) {
+        console.log('Job completed! Returning results...');
+        const insightData = await getRes.json();
+        console.log('Insight data received:', { count: Array.isArray(insightData) ? insightData.length : 'not array' });
+        
+        return new Response(
+          JSON.stringify(insightData),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      if (getRes.status === 202) {
+        console.log('Job still processing, returning 202...');
+        return new Response(
+          JSON.stringify({ status: 'processing', job_id: jobId }),
+          { 
+            status: 202,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+      
+      // Any other status is an error
+      const err = await getRes.text();
+      console.error('GET request error:', getRes.status, err);
+      throw new Error(`Error fetching results: ${getRes.status} – ${err}`);
+    }
+    
+    // Handle POST request to start job
+    if (req.method === 'POST') {
+      console.log('=== HANDLING POST REQUEST TO START JOB ===');
+      
+      const requestData = await req.json();
+      console.log('Received request data:', {
+        tenantsCount: requestData.tenants?.length,
+        userId: requestData.user_id,
+        firstTenant: requestData.tenants?.[0]
+      });
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+      const { tenants, user_id } = requestData;
 
-    // Get Supabase anon key for API calls
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
-    if (!supabaseAnonKey) {
-      throw new Error('SUPABASE_ANON_KEY environment variable is required');
+      // Get Supabase anon key for API calls
+      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+      if (!supabaseAnonKey) {
+        throw new Error('SUPABASE_ANON_KEY environment variable is required');
+      }
+
+      const apiHeaders = {
+        'Content-Type': 'application/json',
+        'apikey': supabaseAnonKey,
+        'Authorization': `Bearer ${supabaseAnonKey}`
+      };
+
+      console.log('Making POST request to start job...');
+      const postRes = await fetch(API_BASE_URL, {
+        method: "POST",
+        headers: apiHeaders,
+        body: JSON.stringify({
+          tenants,
+          user_id
+        }),
+      });
+      
+      console.log('POST response status:', postRes.status);
+      
+      if (!postRes.ok) {
+        const errorText = await postRes.text();
+        console.error('POST request failed:', postRes.status, errorText);
+        throw new Error(`Failed to start job: ${postRes.status}`);
+      }
+      
+      const { job_id } = await postRes.json();
+      console.log('Started job with ID:', job_id);
+      
+      return new Response(
+        JSON.stringify({ job_id }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Default headers for every API call
-    const apiHeaders = {
-      'Content-Type': 'application/json',
-      'apikey': supabaseAnonKey,
-      'Authorization': `Bearer ${supabaseAnonKey}`
-    };
+    // Method not allowed
+    console.log('Method not allowed:', req.method);
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      { 
+        status: 405,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
 
-    console.log('Creating new insight report...');
+  } catch (error) {
+    console.error('=== ERROR IN GENERATE INSIGHTS ===');
+    console.error('Error type:', error.constructor.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    return new Response(
+      JSON.stringify({ 
+        error: error.message,
+        details: 'Failed to process insights request'
+      }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+});
+
     const { data: newReport, error: reportError } = await supabase
       .from('insight_reports')
       .insert({ user_id })
