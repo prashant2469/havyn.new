@@ -187,7 +187,7 @@ Deno.serve(async (req) => {
     console.log('Created new report:', newReport);
 
     console.log('Calling AWS Lambda function for tenant insights...');
-    const lambdaPayload = { tenants, user_id };
+    const lambdaPayload = { tenants, user_id, job_id };
 
     // Use the correct AWS Lambda endpoint
     const lambdaResponse = await fetch(
