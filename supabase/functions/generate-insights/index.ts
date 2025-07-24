@@ -283,7 +283,7 @@ Deno.serve(async (req) => {
         retention_outreach_needed: item.retention_outreach_needed,
         high_delinquency_alert: item.high_delinquency_alert,
         notes_analysis: item.notes_analysis,
-        recommended_actions: item.recommended_actions,
+        recommended_actions: Array.isArray(item.recommended_actions) ? item.recommended_actions : [],
         property: item.property,
         unit: item.unit || 'Unknown',
         reasoning_summary: item.reasoning_summary,
