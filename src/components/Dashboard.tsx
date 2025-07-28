@@ -315,7 +315,7 @@ export function Dashboard() {
         if (!existingRow) {
           // New tenant - count as changed
           changedCount++;
-          console.log(New tenant found: ${newRow.tenant} at ${newRow.property} - ${newRow.unit});
+          console.log(`New tenant found: ${newRow.tenant} at ${newRow.property} - ${newRow.unit}`);
           return;
         }
 
