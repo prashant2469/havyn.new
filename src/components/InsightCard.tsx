@@ -52,7 +52,7 @@ const RiskBar = ({ risk, type }: { risk: string; type: 'turnover' | 'delinquency
         <span className={text-xs font-medium ${getRiskTextColor(risk)}}>{risk}</span>
       </div>
       <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-        <div className={h-full ${baseColor} ${width} rounded-full transition-all duration-300} />
+        <div className={'h-full ${baseColor} ${width} rounded-full transition-all duration-300'} />
       </div>
     </div>
   );
