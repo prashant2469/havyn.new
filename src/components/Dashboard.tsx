@@ -309,7 +309,7 @@ export function Dashboard() {
 
       // Compare each new row with existing data
       newData.forEach(newRow => {
-        const key = ${newRow.property}-${newRow.unit}-${newRow.tenant};
+        const key = `${newRow.property}-${newRow.unit}-${newRow.tenant}`;
         const existingRow = existingDataMap.get(key);
 
         if (!existingRow) {
