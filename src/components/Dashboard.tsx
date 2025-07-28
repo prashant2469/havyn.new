@@ -29,7 +29,8 @@ async function pollForResults(jobId, accessToken, maxAttempts = 30, intervalMs =
   while (attempts < maxAttempts) {
     const res = await fetch(getResultUrl, {
       headers: {
-        Accept: 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer <eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpY2JoZXJxZG9pbWVvd21rdXRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQxNjI5NjcsImV4cCI6MjA1OTczODk2N30.gjtViNNbx-kUeg8AOP0Zd0GIA8KlDX7prizFv4zynXM>`
       }
     });
     if (res.status === 200) return await res.json();
@@ -528,6 +529,7 @@ export function Dashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer <eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpY2JoZXJxZG9pbWVvd21rdXRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQxNjI5NjcsImV4cCI6MjA1OTczODk2N30.gjtViNNbx-kUeg8AOP0Zd0GIA8KlDX7prizFv4zynXM>`
         },
         body: JSON.stringify(requestBody),
       });
