@@ -360,7 +360,7 @@ export function Dashboard() {
             changes: rowChanges
           });
           
-          console.log(Changes detected for ${newRow.tenant}:, rowChanges);
+          console.log(`Changes detected for ${newRow.tenant}:, rowChanges`);
         } else {
           unchangedCount++;
           console.log(`No changes for ${newRow.tenant} - skipping`);
