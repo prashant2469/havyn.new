@@ -538,7 +538,7 @@ export function Dashboard() {
       } else {
         const errorText = await response.text();
         console.error('Edge function error:', response.status, errorText);
-        throw new Error(HTTP error! status: ${response.status});
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
   
       setGeneratingProgress(10);
