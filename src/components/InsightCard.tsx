@@ -109,4 +109,4 @@ const ChangeIndicator = ({
 
 export function InsightCard({ insight, allInsights = [] }: InsightCardProps) {
   const [showHistory, setShowHistory] = useState(false);
-  const [tenantHistory, s]()
+  const [tenantHistory, setTenantHistory] = useState<TenantInsight[]>([]);
