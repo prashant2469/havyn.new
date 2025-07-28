@@ -807,7 +807,7 @@ export function Dashboard() {
                 <span>
                   {files.combined 
                     ? "Combined report file uploaded" 
-                    : `${Object.keys(files).length}/3 files uploaded`
+                    : `${Object.keys(files).length}/3 files uploaded`}
                 </span>
               </div>
             </div>
