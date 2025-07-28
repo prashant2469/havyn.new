@@ -978,7 +978,7 @@ export function Dashboard() {
             <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-[#3F6B28] dark:bg-green-400 rounded-full transition-all duration-300"
-                style={{ width: `${generatingProgress}% }`}
+                style={{ width: `${generatingProgress}% `}}
               />
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">
