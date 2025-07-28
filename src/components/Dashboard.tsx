@@ -378,11 +378,11 @@ export function Dashboard() {
       setAnalysisResults(results);
 
       // Log summary
-      console.log(Data Analysis Complete:
+      console.log(`Data Analysis Complete:
         - Total rows processed: ${results.totalRows}
         - Unchanged rows (skipped): ${results.unchangedRows}
         - Changed rows (kept): ${results.changedRows}
-        - Detailed changes: ${results.changes.length} records);
+        - Detailed changes: ${results.changes.length} records`);
 
     } catch (error) {
       console.error('Error analyzing data changes:', error);
