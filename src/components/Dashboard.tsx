@@ -22,26 +22,6 @@ type SortOrder = 'asc' | 'desc';
 
 type DelinquencySortField = 'tenant' | 'property' | 'amount' | 'aging';
 
-// POLLING HELP
-async function pollForResults(jobId, accessToken, maxAttempts = 30, intervalMs = 2000) {
-  const getResultUrl = `${supabase.supabaseUrl}/functions/v1/get_result?job_id=${jobId}`;
-  let attempts = 0;
-  while (attempts < maxAttempts) {
-    const res = await fetch(getResultUrl, {
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpY2JoZXJxZG9pbWVvd21rdXRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQxNjI5NjcsImV4cCI6MjA1OTczODk2N30.gjtViNNbx-kUeg8AOP0Zd0GIA8KlDX7prizFv4zynXM`
-      }
-    });
-    if (res.status === 200) return await res.json();
-    if (res.status !== 202) throw new Error(`Polling failed: ${res.status}`);
-    await new Promise(r => setTimeout(r, intervalMs));
-    attempts++;
-  }
-  throw new Error('Polling timed out');
-}
-//POLLING HELP
-
 export function Dashboard() {
   const { user } = useAuth();
   const [files, setFiles] = useState<{ [key: string]: File }>({});
@@ -81,6 +61,27 @@ export function Dashboard() {
       changes: Record<string, { old: any; new: any }>;
     }>;
   } | null>(null);
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+  // POLLING HELP
+  async function pollForResults(jobId, maxAttempts = 30, intervalMs = 2000) {
+    const getResultUrl = `${supabase.supabaseUrl}/functions/v1/get_result?job_id=${jobId}`;
+    let attempts = 0;
+    while (attempts < maxAttempts) {
+      const res = await fetch(getResultUrl, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${anonKey}`
+        }
+      });
+      if (res.status === 200) return await res.json();
+      if (res.status !== 202) throw new Error(`Polling failed: ${res.status}`);
+      await new Promise(r => setTimeout(r, intervalMs));
+      attempts++;
+    }
+    throw new Error('Polling timed out');
+  }
+  //POLLING HELP
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -233,7 +234,7 @@ export function Dashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpY2JoZXJxZG9pbWVvd21rdXRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQxNjI5NjcsImV4cCI6MjA1OTczODk2N30.gjtViNNbx-kUeg8AOP0Zd0GIA8KlDX7prizFv4zynXM`
+        Authorization: `Bearer ${anonKey}`
         },
         body: JSON.stringify(base64Data),
       });
@@ -529,7 +530,7 @@ export function Dashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpY2JoZXJxZG9pbWVvd21rdXRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQxNjI5NjcsImV4cCI6MjA1OTczODk2N30.gjtViNNbx-kUeg8AOP0Zd0GIA8KlDX7prizFv4zynXM`
+          'Authorization': `Bearer ${anonKey}`
         },
         body: JSON.stringify(requestBody),
       });
