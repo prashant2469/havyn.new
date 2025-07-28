@@ -1063,7 +1063,7 @@ export function Dashboard() {
             />
             <MetricCard
               title="Average Rent"
-              value={$${Math.round(stats.averageRent).toLocaleString()}}
+              value={`$${Math.round(stats.averageRent).toLocaleString()}`}
               icon={<Building2 className="w-6 h-6" />}
               color="blue"
             />
