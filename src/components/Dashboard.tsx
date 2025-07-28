@@ -363,7 +363,7 @@ export function Dashboard() {
           console.log(Changes detected for ${newRow.tenant}:, rowChanges);
         } else {
           unchangedCount++;
-          console.log(No changes for ${newRow.tenant} - skipping);
+          console.log(`No changes for ${newRow.tenant} - skipping`);
         }
       });
 
