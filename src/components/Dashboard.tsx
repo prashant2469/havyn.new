@@ -23,18 +23,18 @@ type SortOrder = 'asc' | 'desc';
 type DelinquencySortField = 'tenant' | 'property' | 'amount' | 'aging';
 
 // POLLING HELP
-async function pollForResults(jobId, maxAttempts = 30, intervalMs = 2000) {
-  const getResultUrl = ${supabase.supabaseUrl}/functions/v1/get_result?job_id=${jobId};
+async function pollForResults(jobId, accessToken, maxAttempts = 30, intervalMs = 2000) {
+  const getResultUrl = `${supabase.supabaseUrl}/functions/v1/get_result?job_id=${jobId}`;
   let attempts = 0;
   while (attempts < maxAttempts) {
     const res = await fetch(getResultUrl, {
       headers: {
         Accept: 'application/json',
-        Authorization: Bearer ${supabase.supabaseKey}
+        Authorization: `Bearer ${accessToken}`  
       }
     });
     if (res.status === 200) return await res.json();
-    if (res.status !== 202) throw new Error(Polling failed: ${res.status});
+    if (res.status !== 202) throw new Error(`Polling failed: ${res.status}`);
     await new Promise(r => setTimeout(r, intervalMs));
     attempts++;
   }
