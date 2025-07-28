@@ -49,10 +49,10 @@ const RiskBar = ({ risk, type }: { risk: string; type: 'turnover' | 'delinquency
     <div className="w-full">
       <div className="flex justify-between items-center mb-1">
         <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
-        <span className={`text-xs font-medium ${getRiskTextColor(risk)}`}>{risk}</span>
+        <span className={text-xs font-medium ${getRiskTextColor(risk)}}>{risk}</span>
       </div>
       <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-        <div className={`h-full ${baseColor} ${width} rounded-full transition-all duration-300`} />
+        <div className={h-full ${baseColor} ${width} rounded-full transition-all duration-300} />
       </div>
     </div>
   );
@@ -82,7 +82,7 @@ const ChangeIndicator = ({
 
   const formatValue = (value: number | string) => {
     if (format === 'currency') return formatCurrency(value as number);
-    if (format === 'percentage') return `${value}%`;
+    if (format === 'percentage') return ${value}%;
     return value;
   };
 
@@ -99,7 +99,7 @@ const ChangeIndicator = ({
         ) : (
           <TrendingDown className="w-4 h-4 text-green-500" />
         )}
-        <span className={`text-sm ${isIncrease ? "text-red-500" : "text-green-500"}`}>
+        <span className={text-sm ${isIncrease ? "text-red-500" : "text-green-500"}}>
           {formattedNew}
         </span>
       </div>
