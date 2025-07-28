@@ -922,15 +922,17 @@ export function Dashboard() {
                             {field.replace(/_/g, ' ')}:
                           </span>
                           <div className="flex items-center gap-2">
-                            <span className="text-red-600 dark:text-red-400">
-                              {typeof values.old === 'number' ? `$${values.old.toFixed(2)} : 
-                               values.old || 'Empty'`}
-                            </span>
-                            <span className="text-gray-400">→</span>
-                            <span className="text-green-600 dark:text-green-400">
-                              {typeof values.new === 'number' ? $${values.new.toFixed(2)} : 
-                               values.new || 'Empty'}
-                            </span>
+                          <span className="text-red-600 dark:text-red-400">
+                            {typeof values.old === 'number'
+                              ? `$${values.old.toFixed(2)}`
+                              : values.old || 'Empty'}
+                          </span>
+                          <span className="text-gray-400">→</span>
+                          <span className="text-green-600 dark:text-green-400">
+                            {typeof values.new === 'number'
+                              ? `$${values.new.toFixed(2)}`
+                              : values.new || 'Empty'}
+                          </span>    
                           </div>
                         </div>
                       ))}
