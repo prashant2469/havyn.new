@@ -195,7 +195,7 @@ export function Dashboard() {
         return;
       }
     }
-
+  
     setLoading(true);
     setError(null);
     setShowSavedInsights(false);
@@ -205,10 +205,18 @@ export function Dashboard() {
     setRequestData(null);
     setDebugData(null);
     setAnalysisResults(null);
-    
+  
     try {
+      // ----------- FIX: GET THE SESSION FIRST ------------
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setError('You must be logged in to process files');
+        setLoading(false);
+        return;
+      }
+      // ---------------------------------------------------
+  
       let base64Data;
-      
       if (files.combined) {
         base64Data = {
           combined: await fileToBase64(files.combined)
@@ -220,25 +228,25 @@ export function Dashboard() {
           directory: await fileToBase64(files.directory)
         };
       }
-
+  
       const response = await fetch(`${supabase.supabaseUrl}/functions/v1/merge-data`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${session.access_token}`  // <-- Now this is safe!
         },
         body: JSON.stringify(base64Data),
       });
-
+  
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-
+  
       const data = await response.json();
-      
+  
       // Analyze data changes before setting merged data
       await analyzeDataChanges(data);
-      
+  
       setMergedData(data);
     } catch (error) {
       console.error('Error merging files:', error);
@@ -248,6 +256,7 @@ export function Dashboard() {
       setLoading(false);
     }
   };
+
 
   const analyzeDataChanges = async (newData: TenantData[]) => {
     if (!user) return;
