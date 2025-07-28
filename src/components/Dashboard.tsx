@@ -267,7 +267,7 @@ export function Dashboard() {
         return;
       }
 
-      console.log(Found ${existingInsights?.length || 0} existing insights);
+      console.log(`Found ${existingInsights?.length || 0} existing insights`);
       
       if (!existingInsights || existingInsights.length === 0) {
         console.log('No existing data to compare against');
