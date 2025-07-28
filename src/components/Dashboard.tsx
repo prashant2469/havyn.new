@@ -1057,7 +1057,7 @@ export function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <MetricCard
               title="Total Revenue"
-              value={$${stats.totalRevenue.toLocaleString()}}
+              value={`$${stats.totalRevenue.toLocaleString()}`}
               icon={<DollarSign className="w-6 h-6" />}
               color="green"
             />
