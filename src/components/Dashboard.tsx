@@ -65,7 +65,7 @@ export function Dashboard() {
 
   // POLLING HELP
   async function pollForResults(jobId, maxAttempts = 30, intervalMs = 2000) {
-    const getResultUrl = `${supabase.supabaseUrl}/functions/v1/get_results?job_id=${jobId}`;
+    const getResultUrl = `${supabase.supabaseUrl}/functions/v1/get_result?job_id=${jobId}`;
     let attempts = 0;
     while (attempts < maxAttempts) {
       const res = await fetch(getResultUrl, {
@@ -74,10 +74,22 @@ export function Dashboard() {
           'Authorization': `Bearer ${anonKey}`
         }
       });
-      if (res.status === 200) return await res.json();
-      if (res.status !== 202) throw new Error(`Polling failed: ${res.status}`);
-      await new Promise(r => setTimeout(r, intervalMs));
-      attempts++;
+      if (res.status === 200) {
+        const data = await res.json();
+        // Check if data is an array or object as expected
+        if (Array.isArray(data) || (data && typeof data === "object")) {
+          return data;
+        } else {
+          throw new Error("Invalid response format from backend");
+        }
+      }
+      if (res.status === 202) {
+        // Still processing, wait and try again
+        await new Promise(r => setTimeout(r, intervalMs));
+        attempts++;
+        continue;
+      }
+      throw new Error(`Polling failed: ${res.status}`);
     }
     throw new Error('Polling timed out');
   }
