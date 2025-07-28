@@ -2,7 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.39.7';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
@@ -155,7 +155,30 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
-
+  
+  // --- GET HANDLER ---
+  const url = new URL(req.url);
+  if (req.method === 'GET' && url.searchParams.get('job_id')) {
+    // This will proxy/poll your AWS Lambda get_results function:
+    const jobId = url.searchParams.get('job_id');
+    const lambdaRes = await fetch(
+      `https://zv54onyhgk.execute-api.us-west-1.amazonaws.com/prod/get_results?job_id=${encodeURIComponent(jobId)}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
+    );
+    const body = await lambdaRes.text();
+    return new Response(body, {
+      status: lambdaRes.status,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
+  }
   try {
     console.log('Starting generate-insights function...');
 
