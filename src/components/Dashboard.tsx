@@ -1085,48 +1085,47 @@ export function Dashboard() {
             <nav className="flex space-x-8">
               <button
                 onClick={() => setActiveTab('overview')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm $`{
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
                   activeTab === 'overview'
                     ? 'border-havyn-primary text-havyn-primary dark:border-green-400 dark:text-green-400'
                     : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-                }}
+                }`}
               >
                 Overview
               </button>
               <button
                 onClick={() => setActiveTab('location')}
-                className={py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
                   activeTab === 'location'
                     ? 'border-havyn-primary text-havyn-primary dark:border-green-400 dark:text-green-400'
                     : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-                }}
+                }`}
               >
                 Location Insights
               </button>
               <button
                 onClick={() => setActiveTab('delinquency')}
-                className={py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
                   activeTab === 'delinquency'
-                
                     ? 'border-havyn-primary text-havyn-primary dark:border-green-400 dark:text-green-400'
                     : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-                }}
+                }`}
               >
                 Delinquency
               </button>
               <button
                 onClick={() => setActiveTab('leases')}
-                className={py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
                   activeTab === 'leases'
                     ? 'border-havyn-primary text-havyn-primary dark:border-green-400 dark:text-green-400'
                     : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-                }}
+                }`}
               >
                 Lease Timeline
               </button>
             </nav>
           </div>
-
+          
           <div className="mt-6">
             {activeTab === 'overview' && (
               <>
@@ -1142,7 +1141,7 @@ export function Dashboard() {
                     subtitle="Distribution by risk level"
                   />
                 </div>
-
+          
                 <div>
                   <div className="mb-6">
                     <div className="flex justify-between items-center mb-4">
@@ -1150,7 +1149,7 @@ export function Dashboard() {
                         {showSavedInsights ? 'Save Insights' : 'Property Insights'}
                       </h2>
                     </div>
-
+          
                     <div className="flex flex-wrap items-center gap-4">
                       <div className="flex items-center gap-4 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
@@ -1185,7 +1184,7 @@ export function Dashboard() {
                             Delinquency {getSortIcon('delinquency', propertySortField, propertySortOrder)}
                           </button>
                         </div>
-
+          
                         <div className="flex items-center gap-4 ml-auto">
                           <div className="relative">
                             <input
@@ -1197,7 +1196,7 @@ export function Dashboard() {
                             />
                             <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
                           </div>
-
+          
                           <select
                             value={selectedProperty || ''}
                             onChange={(e) => {
@@ -1217,7 +1216,7 @@ export function Dashboard() {
                           </select>
                         </div>
                       </div>
-
+          
                       <button
                         onClick={toggleAllProperties}
                         className="flex items-center gap-2 px-4 py-1.5 text-[#3F6B28] dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors whitespace-nowrap"
@@ -1236,7 +1235,7 @@ export function Dashboard() {
                       </button>
                     </div>
                   </div>
-
+          
                   <div className="space-y-4">
                     {filterAndSortProperties()
                       .filter(([property]) => !selectedProperty || property === selectedProperty)
@@ -1254,11 +1253,11 @@ export function Dashboard() {
                 </div>
               </>
             )}
-
+          
             {activeTab === 'location' && (
               <LocationInsights insights={insights} />
             )}
-
+          
             {activeTab === 'delinquency' && (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
                 <div className="flex justify-between items-center mb-6">
@@ -1326,7 +1325,7 @@ export function Dashboard() {
                 />
               </div>
             )}
-
+          
             {activeTab === 'leases' && (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
                 <h2 className="text-xl font-semibold text-[#3F6B28] dark:text-green-400 mb-6">Lease Timeline</h2>
