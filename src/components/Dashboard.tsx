@@ -30,7 +30,6 @@ async function pollForResults(jobId, accessToken, maxAttempts = 30, intervalMs =
     const res = await fetch(getResultUrl, {
       headers: {
         Accept: 'application/json',
-        Authorization: `Bearer ${accessToken}`  
       }
     });
     if (res.status === 200) return await res.json();
@@ -529,7 +528,6 @@ export function Dashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.supabaseKey}`
         },
         body: JSON.stringify(requestBody),
       });
