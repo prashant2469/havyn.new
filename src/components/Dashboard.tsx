@@ -516,7 +516,7 @@ export function Dashboard() {
   
       console.log('Calling generate-insights edge function...');
       // 2. POST to generate-insights
-      const response = await fetch(${supabase.supabaseUrl}/functions/v1/generate-insights, {
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/generate-insights`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
