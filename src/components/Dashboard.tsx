@@ -234,7 +234,7 @@ export function Dashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        Authorization: `Bearer ${anonKey}`
+          'Authorization': `Bearer ${anonKey}`
         },
         body: JSON.stringify(base64Data),
       });
