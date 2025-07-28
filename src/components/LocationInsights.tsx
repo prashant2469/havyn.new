@@ -117,11 +117,11 @@ export function LocationInsights({ insights }: LocationInsightsProps) {
     setGeneratingProgress(0);
 
     try {
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/generate-location-insights`, {
+      const response = await fetch(${supabase.supabaseUrl}/functions/v1/generate-location-insights, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.supabaseKey}`
+          'Authorization': Bearer ${supabase.supabaseKey}
         },
         body: JSON.stringify({
           properties: uniqueProperties,
@@ -131,7 +131,7 @@ export function LocationInsights({ insights }: LocationInsightsProps) {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to generate insights: ${errorText}`);
+        throw new Error(Failed to generate insights: ${errorText});
       }
 
       const data = await response.json();
@@ -186,12 +186,12 @@ export function LocationInsights({ insights }: LocationInsightsProps) {
       <div className="relative pt-1">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-semibold text-gray-700">Market Strength</span>
-          <span className={`text-xs font-bold ${getScoreColor(score)}`}>{score}/10</span>
+          <span className={text-xs font-bold ${getScoreColor(score)}}>{score}/10</span>
         </div>
         <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200">
           <div
-            style={{ width: `${percentage}%` }}
-            className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${getColor()}`}
+            style={{ width: ${percentage}% }}
+            className={shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${getColor()}}
           />
         </div>
       </div>
@@ -212,12 +212,12 @@ export function LocationInsights({ insights }: LocationInsightsProps) {
       <div className="relative pt-1">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-semibold text-gray-700">Vacancy Rate</span>
-          <span className={`text-xs font-bold ${getVacancyColor(rate)}`}>{rate}</span>
+          <span className={text-xs font-bold ${getVacancyColor(rate)}}>{rate}</span>
         </div>
         <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200">
           <div
-            style={{ width: `${width}%` }}
-            className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${getColor()}`}
+            style={{ width: ${width}% }}
+            className={shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${getColor()}}
           />
         </div>
       </div>
@@ -252,7 +252,7 @@ export function LocationInsights({ insights }: LocationInsightsProps) {
         <div className="text-xs font-semibold text-gray-700 mb-1">Rent Trend</div>
         <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
           {getTrendIcon()}
-          <span className={`text-sm font-medium ${getTrendColor()}`}>{trend}</span>
+          <span className={text-sm font-medium ${getTrendColor()}}>{trend}</span>
         </div>
       </div>
     );
@@ -286,7 +286,7 @@ export function LocationInsights({ insights }: LocationInsightsProps) {
         <div className="text-xs font-semibold text-gray-700 mb-1">Construction</div>
         <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
           {getSupplyIcon()}
-          <span className={`text-sm font-medium ${getSupplyColor()}`}>{supply}</span>
+          <span className={text-sm font-medium ${getSupplyColor()}}>{supply}</span>
         </div>
       </div>
     );
@@ -378,7 +378,7 @@ export function LocationInsights({ insights }: LocationInsightsProps) {
             <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-havyn-primary dark:bg-green-400 rounded-full transition-all duration-300"
-                style={{ width: `${generatingProgress}%` }}
+                style={{ width: ${generatingProgress}% }}
               />
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -405,23 +405,23 @@ export function LocationInsights({ insights }: LocationInsightsProps) {
                       setMapZoom(15);
                     }
                   }}
-                  className={`w-full text-left p-3 rounded-lg transition-colors ${
+                  className={w-full text-left p-3 rounded-lg transition-colors ${
                     selectedLocation?.id === location.id
                       ? 'bg-havyn-primary bg-opacity-10 dark:bg-opacity-20'
                       : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
+                  }}
                 >
                   <div className="flex items-start gap-2">
-                    <MapPin className={`w-5 h-5 flex-shrink-0 ${
+                    <MapPin className={w-5 h-5 flex-shrink-0 ${
                       selectedLocation?.id === location.id
                         ? 'text-havyn-primary dark:text-green-400'
                         : 'text-gray-400'
-                    }`} />
+                    }} />
                     <div>
                       <div className="font-medium text-gray-900 dark:text-white">
                         {location.property}
                       </div>
-                      <div className={`text-sm font-medium ${getScoreColor(location.rental_market_strength_score)}`}>
+                      <div className={text-sm font-medium ${getScoreColor(location.rental_market_strength_score)}}>
                         Score: {location.rental_market_strength_score}/10
                       </div>
                     </div>
@@ -527,3 +527,5 @@ export function LocationInsights({ insights }: LocationInsightsProps) {
     </div>
   );
 }
+
+
