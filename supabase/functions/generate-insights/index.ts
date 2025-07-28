@@ -230,7 +230,7 @@ Deno.serve(async (req) => {
     if (!lambdaResponse.ok) {
       const errorText = await lambdaResponse.text();
       console.error('Lambda API error:', errorText);
-      throw new Error(Lambda API failed with status ${lambdaResponse.status}: ${errorText});
+      throw new Error(`Lambda API failed with status ${lambdaResponse.status}: ${errorText}`);
     }
 
     const rawLambdaResponse = await lambdaResponse.json();
