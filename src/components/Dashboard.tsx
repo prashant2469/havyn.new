@@ -283,7 +283,7 @@ export function Dashboard() {
       // Create a map of existing data for quick lookup
       const existingDataMap = new Map();
       existingInsights.forEach(insight => {
-        const key = ${insight.property}-${insight.unit}-${insight.tenant_name};
+        const key = `${insight.property}-${insight.unit}-${insight.tenant_name}`;
         existingDataMap.set(key, {
           rent_amount: insight.rent_amount,
           delinquent_rent: insight.delinquent_rent,
