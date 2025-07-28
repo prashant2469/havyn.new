@@ -520,7 +520,7 @@ export function Dashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': Bearer ${supabase.supabaseKey}
+          'Authorization': `Bearer ${supabase.supabaseKey}`
         },
         body: JSON.stringify(requestBody),
       });
