@@ -221,7 +221,7 @@ export function Dashboard() {
         };
       }
 
-      const response = await fetch(${supabase.supabaseUrl}/functions/v1/merge-data, {
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/merge-data`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
