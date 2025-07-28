@@ -1085,7 +1085,7 @@ export function Dashboard() {
             <nav className="flex space-x-8">
               <button
                 onClick={() => setActiveTab('overview')}
-                className={py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-4 px-1 border-b-2 font-medium text-sm $`{
                   activeTab === 'overview'
                     ? 'border-havyn-primary text-havyn-primary dark:border-green-400 dark:text-green-400'
                     : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
