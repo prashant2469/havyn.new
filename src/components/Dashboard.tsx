@@ -74,10 +74,23 @@ export function Dashboard() {
           'Authorization': `Bearer ${anonKey}`
         }
       });
-      if (res.status === 200) {
-        const data = await res.json();
   
-        // Parse body if present
+      // DEBUG: log the status and response text
+      console.log('Polling: status', res.status);
+      const pollText = await res.text();
+      console.log('Polling: raw response text:', pollText);
+  
+      let data;
+      try {
+        data = JSON.parse(pollText);
+        console.log('Polling: parsed JSON:', data);
+      } catch (e) {
+        console.error('Polling: failed to parse JSON!', e, pollText);
+        throw new Error('Poll did not return valid JSON: ' + pollText);
+      }
+  
+      if (res.status === 200) {
+        // Parse body if present (legacy pattern)
         let statusPayload = data;
         if (data && typeof data.body === "string") {
           try {
@@ -99,14 +112,18 @@ export function Dashboard() {
         if (Array.isArray(data) || (data && typeof data === "object" && !data.status)) {
           return data;
         }
-        throw new Error("Invalid response format from backend");
+        throw new Error("Invalid response format from backend: " + pollText);
       }
+  
       if (res.status === 202) {
+        // Still processing, wait and retry
         await new Promise(r => setTimeout(r, intervalMs));
         attempts++;
         continue;
       }
-      throw new Error(`Polling failed: ${res.status}`);
+  
+      // Any other status
+      throw new Error(`Polling failed: ${res.status}, response: ${pollText}`);
     }
     throw new Error('Polling timed out');
   }
@@ -577,6 +594,7 @@ export function Dashboard() {
       setGeneratingProgress(10);
   
       // --- NEW: Poll for results ---
+      console.log('Polling for results with job_id:', job_id);
       const results = await pollForResults(job_id);
       setGeneratingProgress(100);
   
