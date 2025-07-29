@@ -65,7 +65,7 @@ export function Dashboard() {
 
   // POLLING HELP
   async function pollForResults(jobId, maxAttempts = 30, intervalMs = 2000) {
-    const getResultUrl = `${supabase.supabaseUrl}/functions/v1/get_result?job_id=${jobId}`;
+    const getResultUrl = `${supabase.supabaseUrl}/functions/v1/get_results?job_id=${jobId}`;
     let attempts = 0;
     while (attempts < maxAttempts) {
       const res = await fetch(getResultUrl, {
