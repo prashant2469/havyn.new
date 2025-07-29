@@ -537,7 +537,7 @@ export function Dashboard() {
         { method: "POST", headers: { "Content-Type": "application/json" } }
       );
       if (!resp.ok) throw new Error("Failed to get presigned S3 URL");
-      const { presigned_url, job_id } = await resp.json();
+      //const { presigned_url, job_id } = await resp.json();
 
       console.log('Got presigned URL response:', resp);
 
