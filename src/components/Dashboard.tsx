@@ -591,7 +591,12 @@ export function Dashboard() {
   
       setTimeout(() => {
         if (Array.isArray(results)) {
-          setInsights(results);
+          // Map tenant_score to score for frontend display
+          const formattedInsights = results.map(insight => ({
+            ...insight,
+            score: typeof insight.tenant_score === 'number' ? insight.tenant_score : 0,
+          }));
+          setInsights(formattedInsights);
           setGeneratingProgress(0);
           setRequestData(null);
           setIsGenerating(false);
@@ -601,6 +606,7 @@ export function Dashboard() {
           setIsGenerating(false);
         }
       }, 500);
+
   
       // --- Old/Commented-Out Code (for reference) ---
       /*
