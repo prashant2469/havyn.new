@@ -541,6 +541,11 @@ export function Dashboard() {
 
       console.log('Got presigned URL response:', resp);
 
+      const data = await resp.json();
+      console.log('Parsed JSON:', data);
+
+      const { presigned_url, job_id, s3_key } = data;
+      
       // --- NEW: Upload mergedData to S3 using presigned URL ---
       const uploadResp = await fetch(presigned_url, {
         method: "PUT",
