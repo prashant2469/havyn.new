@@ -527,15 +527,20 @@ export function Dashboard() {
       //   user_id: user.id
       // };
       // setRequestData(JSON.stringify(requestBody, null, 2));
-  
+
+      
       // ----- NEW: Request Presigned S3 URL + job_id -----
+      console.log('About to fetch presigned-upload-url');
+
       const resp = await fetch(
         "https://dy7d1mkqgd.execute-api.us-west-1.amazonaws.com/prod/presigned-upload-url",
         { method: "POST", headers: { "Content-Type": "application/json" } }
       );
       if (!resp.ok) throw new Error("Failed to get presigned S3 URL");
       const { presigned_url, job_id } = await resp.json();
-  
+
+      console.log('Got presigned URL response:', resp);
+
       // --- NEW: Upload mergedData to S3 using presigned URL ---
       const uploadResp = await fetch(presigned_url, {
         method: "PUT",
@@ -600,6 +605,8 @@ export function Dashboard() {
       // --- END Old Code ---
   
     } catch (error) {
+      console.error('Error in generateInsights:', error);
+
       setError(error instanceof Error ? error.message : 'Error generating insights');
       setInsights([]);
       setIsGenerating(false);
