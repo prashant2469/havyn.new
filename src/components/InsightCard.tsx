@@ -58,7 +58,8 @@ const RiskBar = ({ risk, type }: { risk: string; type: 'turnover' | 'delinquency
   );
 };
 
-const formatCurrency = (amount: number) => {
+const formatCurrency = (amount: number | undefined) => {
+  if (typeof amount !== 'number' || isNaN(amount)) return '';
   return amount.toLocaleString('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -159,7 +160,7 @@ export function InsightCard({ insight, allInsights = [] }: InsightCardProps) {
             </div>
             <div className="bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full">
               <span className="text-sm font-medium text-gray-900 dark:text-white">
-                {formatCurrency(insight.rent_amount)}
+                {typeof insight.rent_amount === 'number' ? formatCurrency(insight.rent_amount) : 'N/A'}
               </span>
             </div>
           </div>
