@@ -76,15 +76,32 @@ export function Dashboard() {
       });
       if (res.status === 200) {
         const data = await res.json();
-        // Check if data is an array or object as expected
-        if (Array.isArray(data) || (data && typeof data === "object")) {
-          return data;
-        } else {
-          throw new Error("Invalid response format from backend");
+  
+        // Parse body if present
+        let statusPayload = data;
+        if (data && typeof data.body === "string") {
+          try {
+            statusPayload = JSON.parse(data.body);
+          } catch {}
         }
+  
+        // If status is "processing", poll again
+        if (
+          (statusPayload.status && statusPayload.status === "processing") ||
+          (data.status && data.status === "processing")
+        ) {
+          await new Promise(r => setTimeout(r, intervalMs));
+          attempts++;
+          continue;
+        }
+  
+        // Return real result (final)
+        if (Array.isArray(data) || (data && typeof data === "object" && !data.status)) {
+          return data;
+        }
+        throw new Error("Invalid response format from backend");
       }
       if (res.status === 202) {
-        // Still processing, wait and try again
         await new Promise(r => setTimeout(r, intervalMs));
         attempts++;
         continue;
