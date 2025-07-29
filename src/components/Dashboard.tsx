@@ -517,44 +517,55 @@ export function Dashboard() {
     setGeneratingProgress(0);
   
     try {
-      console.log('Starting Generate Insights flow...');
-      
-      // 1. Generate a unique job_id
-      const job_id = crypto.randomUUID();
-  
       setDebugData({
         allTenants: mergedData,
         sampledTenants: mergedData
       });
-
-      // Prepare tenant data for API
-      const tenantData = mergedData.map(tenant => ({
-        property: tenant.property,
-        unit: tenant.unit,
-        tenant: tenant.tenant,
-        rentAmount: tenant.rentAmount,
-        pastDue: tenant.pastDue,
-        delinquentRent: tenant.delinquentRent,
-        aging30: tenant.aging30,
-        aging60: tenant.aging60,
-        aging90: tenant.aging90,
-        agingOver90: tenant.agingOver90,
-        delinquencyNotes: tenant.delinquencyNotes,
-        moveInDate: tenant.moveInDate,
-        leaseEndDate: tenant.leaseEndDate,
-        phoneNumbers: tenant.phoneNumbers,
-        emails: tenant.emails
-      }));
   
-      const requestBody = { 
-        tenants: tenantData,
-        user_id: user.id,
-        job_id // Add job_id to request!
-      };
-      setRequestData(JSON.stringify(requestBody, null, 2));
+      // const requestBody = { 
+      //   tenants: mergedData,
+      //   user_id: user.id
+      // };
+      // setRequestData(JSON.stringify(requestBody, null, 2));
   
-      console.log('Calling generate-insights edge function...');
-      // 2. POST to generate-insights
+      // ----- NEW: Request Presigned S3 URL + job_id -----
+      const resp = await fetch(
+        "https://dy7d1mkqgd.execute-api.us-west-1.amazonaws.com/prod/presigned-upload-url",
+        { method: "POST", headers: { "Content-Type": "application/json" } }
+      );
+      if (!resp.ok) throw new Error("Failed to get presigned S3 URL");
+      const { presigned_url, job_id } = await resp.json();
+  
+      // --- NEW: Upload mergedData to S3 using presigned URL ---
+      const uploadResp = await fetch(presigned_url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mergedData)
+      });
+      if (!uploadResp.ok) throw new Error("Failed to upload input.json to S3");
+      // --- END NEW ---
+  
+      setGeneratingProgress(10);
+  
+      // --- NEW: Poll for results ---
+      const results = await pollForResults(job_id);
+      setGeneratingProgress(100);
+  
+      setTimeout(() => {
+        if (Array.isArray(results)) {
+          setInsights(results);
+          setGeneratingProgress(0);
+          setRequestData(null);
+          setIsGenerating(false);
+        } else {
+          setError('Invalid response format');
+          setInsights([]);
+          setIsGenerating(false);
+        }
+      }, 500);
+  
+      // --- Old/Commented-Out Code (for reference) ---
+      /*
       const response = await fetch(`${supabase.supabaseUrl}/functions/v1/generate-insights`, {
         method: 'POST',
         headers: {
@@ -564,49 +575,37 @@ export function Dashboard() {
         body: JSON.stringify(requestBody),
       });
   
-      // 3. Handle 202 response and extract job_id (may be in body or rawLambdaResponse)
-      let jobIdToPoll = job_id; // fallback
-      if (response.status === 202 || response.status === 200) {
-        const respData = await response.json();
-        // Try to extract job_id if it is sent from backend (for forward compatibility)
-        if (respData.job_id) jobIdToPoll = respData.job_id;
-        else if (respData.body) {
-          const b = typeof respData.body === 'string' ? JSON.parse(respData.body) : respData.body;
-          if (b.job_id) jobIdToPoll = b.job_id;
-        }
-      } else {
-        const errorText = await response.text();
-        console.error('Edge function error:', response.status, errorText);
+      if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
   
-      setGeneratingProgress(10);
-  
-      // 4. Poll for completion
-      const results = await pollForResults(jobIdToPoll);
-      console.log('Received insights:', { count: results?.length });
+      const data = await response.json();
       setGeneratingProgress(100);
-  
       setTimeout(() => {
-        if (Array.isArray(results)) {
-          setInsights(results);
-          console.log('Successfully generated insights');
+        // Check if this is debug data from Lambda
+        if (data.debug && data.rawLambdaResponse) {
+          // Display raw JSON for testing
+          alert('Raw Lambda Response:\n\n' + JSON.stringify(data.rawLambdaResponse, null, 2));
+          console.log('Raw Lambda Response:', data.rawLambdaResponse);
+          console.log('Request Payload:', data.requestPayload);
+          setInsights([]);
         } else {
-          console.error('Invalid insights format:', results);
-          throw new Error('Invalid response format');
+          setInsights(data);
         }
         setGeneratingProgress(0);
         setRequestData(null);
         setIsGenerating(false);
       }, 500);
+      */
+      // --- END Old Code ---
+  
     } catch (error) {
-      console.error('Generate insights error:', error);
       setError(error instanceof Error ? error.message : 'Error generating insights');
       setInsights([]);
       setIsGenerating(false);
     }
   };
-  // NEW
+  // ----- END NEW ----------
   
   const showUploadView = () => {
     setShowUploadSection(true);
