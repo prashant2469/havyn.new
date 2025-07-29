@@ -122,7 +122,7 @@ export function PropertyGroup({ property, insights, isExpanded, onToggle, allIns
         <div className="p-6 border-t border-gray-100 dark:border-gray-700">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredInsights.map((insight) => (
-              <InsightCard
+               <InsightCard
                 key={`${insight.property}-${insight.unit}-${insight.tenant_name}`}
                 insight={insight}
                 allInsights={allInsights}
