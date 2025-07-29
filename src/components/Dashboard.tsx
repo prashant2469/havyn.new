@@ -571,6 +571,7 @@ export function Dashboard() {
         body: JSON.stringify(mergedData)
       });
       if (!uploadResp.ok) throw new Error("Failed to upload input.json to S3");
+      console.log('S3 upload response:', uploadResp);
       // --- END NEW ---
   
       setGeneratingProgress(10);
