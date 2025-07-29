@@ -144,6 +144,8 @@ export function InsightCard({ insight, allInsights = [] }: InsightCardProps) {
     setShowHistory(true);
   };
 
+  const percentage = typeof insight.score === "number" ? Math.round(insight.score * 100) : null;
+
   return (
     <>
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col">
@@ -176,7 +178,7 @@ export function InsightCard({ insight, allInsights = [] }: InsightCardProps) {
                 />
               ) : (
                 <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {typeof insight.score === "number" && !isNaN(insight.score) ? `${insight.score}%` : "N/A"}
+                    {percentage !== null && !isNaN(percentage) ? `${percentage}%` : "N/A"}
                 </span>
               )}
             </div>
