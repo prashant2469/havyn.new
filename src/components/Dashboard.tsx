@@ -74,8 +74,6 @@ export function Dashboard() {
           'Authorization': `Bearer ${anonKey}`
         }
       });
-  
-      // DEBUG: log the status and response text
       console.log('Polling: status', res.status);
       const pollText = await res.text();
       console.log('Polling: raw response text:', pollText);
@@ -89,41 +87,34 @@ export function Dashboard() {
         throw new Error('Poll did not return valid JSON: ' + pollText);
       }
   
-      if (res.status === 200) {
-        // Parse body if present (legacy pattern)
-        let statusPayload = data;
-        if (data && typeof data.body === "string") {
-          try {
-            statusPayload = JSON.parse(data.body);
-          } catch {}
-        }
-  
-        // If status is "processing", poll again
-        if (
-          (statusPayload.status && statusPayload.status === "processing") ||
-          (data.status && data.status === "processing")
-        ) {
-          await new Promise(r => setTimeout(r, intervalMs));
-          attempts++;
-          continue;
-        }
-  
-        // Return real result (final)
-        if (Array.isArray(data) || (data && typeof data === "object" && !data.status)) {
-          return data;
-        }
-        throw new Error("Invalid response format from backend: " + pollText);
-      }
-  
-      if (res.status === 202) {
-        // Still processing, wait and retry
+      // Handle "processing" status first!
+      if (
+        (data && typeof data.status === "string" && data.status === "processing") ||
+        (data.body && typeof data.body === "string" && data.body.includes('"status":"processing"'))
+      ) {
         await new Promise(r => setTimeout(r, intervalMs));
         attempts++;
         continue;
       }
   
-      // Any other status
-      throw new Error(`Polling failed: ${res.status}, response: ${pollText}`);
+      // Try to parse the real result array
+      let resultArray = data;
+      if (data && typeof data.body === "string") {
+        try {
+          resultArray = JSON.parse(data.body);
+          console.log('Parsed poll body as array:', resultArray);
+        } catch (e) {
+          console.error('Failed to parse poll body!', e, data.body);
+          throw new Error("Invalid response format from backend: " + data.body);
+        }
+      }
+  
+      // Return the result array if valid
+      if (Array.isArray(resultArray)) {
+        return resultArray;
+      }
+  
+      throw new Error("Invalid response format from backend: " + JSON.stringify(resultArray));
     }
     throw new Error('Polling timed out');
   }
