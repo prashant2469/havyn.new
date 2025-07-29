@@ -176,7 +176,7 @@ export function InsightCard({ insight, allInsights = [] }: InsightCardProps) {
                 />
               ) : (
                 <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {Math.round((insight.score / 100) * 100)}%
+                    {typeof insight.score === "number" && !isNaN(insight.score) ? `${insight.score}%` : "N/A"}
                 </span>
               )}
             </div>
