@@ -52,6 +52,8 @@ export function PropertyGroup({ property, insights, isExpanded, onToggle, allIns
         insight.unit.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : insights;
+  
+  console.log("Property insights:", insights);  // Add this to see what's being passed
 
   return (
     <div className="mb-4 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
