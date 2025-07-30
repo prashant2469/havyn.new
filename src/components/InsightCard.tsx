@@ -59,7 +59,7 @@ const RiskBar = ({ risk, type }: { risk: string; type: 'turnover' | 'delinquency
 };
 
 const formatCurrency = (amount: number | undefined) => {
-  if (typeof amount !== 'number' || isNaN(amount)) return '';
+  if (typeof amount !== 'number' || isNaN(amount)) return '$0.00';
   return amount.toLocaleString('en-US', {
     style: 'currency',
     currency: 'USD',
