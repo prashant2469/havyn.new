@@ -44,7 +44,7 @@ const RiskBar = ({ risk, type }: { risk: string; type: 'turnover' | 'delinquency
   const width = riskLevel === 'high' ? 'w-full' : riskLevel === 'medium' ? 'w-2/3' : 'w-1/3';
   const baseColor = getRiskColor(risk);
   const label = type === 'turnover' ? 'Turnover Risk' : 'Delinquency Risk';
-  
+
   return (
     <div className="w-full">
       <div className="flex justify-between items-center mb-1">
@@ -143,6 +143,8 @@ export function InsightCard({ insight, allInsights = [] }: InsightCardProps) {
     }
     setShowHistory(true);
   };
+  
+  console.log("Insight data:", insight);  // Log each individual insight
 
   return (
     <>
