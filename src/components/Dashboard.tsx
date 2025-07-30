@@ -72,8 +72,8 @@ export function Dashboard() {
       const res = await fetch(getResultUrl, {
         headers: {
           'Accept': 'application/json',
-          'Authorization': `Bearer ${anonKey}`,
-        },
+          'Authorization': `Bearer ${anonKey}`
+        }
       });
   
       const pollText = await res.text();
@@ -88,38 +88,46 @@ export function Dashboard() {
         throw new Error('Poll did not return valid JSON: ' + pollText);
       }
   
-      // Handle "processing" status
+      // Calculate progress based on attempts
+      const progress = (attempts / maxAttempts) * 100;
+      setGeneratingProgress(progress); // Update progress based on attempts
+      
+      // Handle "processing" status first!
       if (
-        data &&
-        (data.status === 'processing' || (data.body && data.body.includes('"status":"processing"')))
+        (data && data.status === "processing") ||
+        (data.body && typeof data.body === "string" && data.body.includes('"status":"processing"'))
       ) {
         console.log('Polling: still processing...');
-        await new Promise((r) => setTimeout(r, intervalMs)); // Wait before retrying
+        await new Promise(r => setTimeout(r, intervalMs)); // Wait before retrying
         attempts++;
         continue;
       }
   
-      // Parse the result when processing is done
-      let resultArray = data;
-      if (data && typeof data.body === 'string') {
-        try {
-          resultArray = JSON.parse(data.body);
-          console.log('Parsed poll body as array:', resultArray);
-        } catch (e) {
-          console.error('Failed to parse poll body!', e, data.body);
-          throw new Error('Invalid response format from backend: ' + data.body);
+      // If status is "complete", return the result
+      if (data && data.status === "complete") {
+        let resultArray = data;
+        if (data && typeof data.body === "string") {
+          try {
+            resultArray = JSON.parse(data.body);
+            console.log('Parsed poll body as array:', resultArray);
+          } catch (e) {
+            console.error('Failed to parse poll body!', e, data.body);
+            throw new Error("Invalid response format from backend: " + data.body);
+          }
         }
+  
+        // Return the valid result if it's an array
+        if (Array.isArray(resultArray)) {
+          return resultArray;
+        }
+  
+        console.log("INVALID RESPONSE: " + JSON.stringify(resultArray));
+        throw new Error("Invalid response format from backend: " + JSON.stringify(resultArray));
       }
   
-      // If the result is a valid array of insights, return it
-      if (Array.isArray(resultArray)) {
-        return resultArray;
-      }
-  
-      console.log('INVALID RESPONSE:', JSON.stringify(resultArray));
-      throw new Error('Invalid response format from backend: ' + JSON.stringify(resultArray));
+      // Handle cases where the backend response format is unexpected
+      throw new Error('Polling timed out or invalid response format');
     }
-  
     throw new Error('Polling timed out');
   }
   //POLLING HELP
