@@ -74,7 +74,7 @@ export function Dashboard() {
           'Authorization': `Bearer ${anonKey}`
         }
       });
-      console.log('Polling: status', res.status);
+  
       const pollText = await res.text();
       console.log('Polling: raw response text:', pollText);
   
@@ -87,17 +87,15 @@ export function Dashboard() {
         throw new Error('Poll did not return valid JSON: ' + pollText);
       }
   
-      // Handle "processing" status first!
-      if (
-        (data && typeof data.status === "string" && data.status === "processing") ||
-        (data.body && typeof data.body === "string" && data.body.includes('"status":"processing"'))
-      ) {
+      // If the job is still processing, retry
+      if (data && data.status === "processing") {
+        console.log('Polling: still processing...');
         await new Promise(r => setTimeout(r, intervalMs));
         attempts++;
         continue;
       }
   
-      // Try to parse the real result array
+      // Handle valid results
       let resultArray = data;
       if (data && typeof data.body === "string") {
         try {
@@ -109,7 +107,7 @@ export function Dashboard() {
         }
       }
   
-      // Return the result array if valid
+      // Return the result if it's valid
       if (Array.isArray(resultArray)) {
         return resultArray;
       }
