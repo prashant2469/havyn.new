@@ -64,57 +64,61 @@ export function Dashboard() {
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
   // POLLING HELP
-  async function pollForResults(jobId, maxAttempts = 30, intervalMs = 2000) {
-    const getResultUrl = `${supabase.supabaseUrl}/functions/v1/get_results?job_id=${jobId}`;
-    let attempts = 0;
-    while (attempts < maxAttempts) {
-      const res = await fetch(getResultUrl, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${anonKey}`
-        }
-      });
+  async function pollForResults(jobId, maxAttempts = 30, intervalMs = 3000) {
+      const getResultUrl = `${supabase.supabaseUrl}/functions/v1/get_results?job_id=${jobId}`;
+      let attempts = 0;
   
-      const pollText = await res.text();
-      console.log('Polling: raw response text:', pollText);
+      while (attempts < maxAttempts) {
+          const res = await fetch(getResultUrl, {
+              headers: {
+                  'Accept': 'application/json',
+                  'Authorization': `Bearer ${anonKey}`
+              }
+          });
+          console.log('Polling: status', res.status);
+          const pollText = await res.text();
+          console.log('Polling: raw response text:', pollText);
   
-      let data;
-      try {
-        data = JSON.parse(pollText);
-        console.log('Polling: parsed JSON:', data);
-      } catch (e) {
-        console.error('Polling: failed to parse JSON!', e, pollText);
-        throw new Error('Poll did not return valid JSON: ' + pollText);
+          let data;
+          try {
+              data = JSON.parse(pollText);
+              console.log('Polling: parsed JSON:', data);
+          } catch (e) {
+              console.error('Polling: failed to parse JSON!', e, pollText);
+              throw new Error('Poll did not return valid JSON: ' + pollText);
+          }
+  
+          // Handle "processing" status first!
+          if (
+              (data && data.status === "processing") ||
+              (data.body && typeof data.body === "string" && data.body.includes('"status":"processing"'))
+          ) {
+              console.log('Polling: still processing...');
+              await new Promise(r => setTimeout(r, intervalMs));
+              attempts++;
+              continue;
+          }
+  
+          // Return real result (final)
+          let resultArray = data;
+          if (data && typeof data.body === "string") {
+              try {
+                  resultArray = JSON.parse(data.body);
+                  console.log('Parsed poll body as array:', resultArray);
+              } catch (e) {
+                  console.error('Failed to parse poll body!', e, data.body);
+                  throw new Error("Invalid response format from backend: " + data.body);
+              }
+          }
+  
+          // Return the result if it's valid
+          if (Array.isArray(resultArray)) {
+              return resultArray;
+          }
+  
+          throw new Error("Invalid response format from backend: " + JSON.stringify(resultArray));
       }
-  
-      // If the job is still processing, retry
-      if (data && data.status === "processing") {
-        console.log('Polling: still processing...');
-        await new Promise(r => setTimeout(r, intervalMs));
-        attempts++;
-        continue;
-      }
-  
-      // Handle valid results
-      let resultArray = data;
-      if (data && typeof data.body === "string") {
-        try {
-          resultArray = JSON.parse(data.body);
-          console.log('Parsed poll body as array:', resultArray);
-        } catch (e) {
-          console.error('Failed to parse poll body!', e, data.body);
-          throw new Error("Invalid response format from backend: " + data.body);
-        }
-      }
-  
-      // Return the result if it's valid
-      if (Array.isArray(resultArray)) {
-        return resultArray;
-      }
-  
-      throw new Error("Invalid response format from backend: " + JSON.stringify(resultArray));
-    }
-    throw new Error('Polling timed out');
+      throw new Error('Polling timed out');
   }
   //POLLING HELP
 
