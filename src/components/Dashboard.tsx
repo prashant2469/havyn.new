@@ -115,7 +115,8 @@ export function Dashboard() {
           if (Array.isArray(resultArray)) {
               return resultArray;
           }
-  
+
+          console.log("INVALID RESPONSE: " + JSON.stringify(resultArray));
           throw new Error("Invalid response format from backend: " + JSON.stringify(resultArray));
       }
       throw new Error('Polling timed out');
