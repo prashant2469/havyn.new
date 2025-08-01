@@ -712,8 +712,17 @@ export function Dashboard() {
     
     if (!insightsArray.length) return null;
 
-    const totalRevenue = insightsArray.reduce((sum, insight) => sum + insight.rent_amount, 0);
-    const averageRent = totalRevenue / insightsArray.length;
+    const totalRevenue = insightsArray.reduce(
+      (sum, insight) => sum + (typeof insight.rent_amount === 'number'
+        ? insight.rent_amount
+        : Number(insight.rent_amount) || 0),
+      0
+    );
+    
+    const averageRent = insightsArray.length > 0
+      ? totalRevenue / insightsArray.length
+      : 0;
+
 
     const delinquentCount = insightsArray.filter(i => i.delinquent_rent > 0).length;
     const upcomingLeases = insightsArray.filter(i => {
