@@ -137,7 +137,6 @@ export function Dashboard() {
       throw new Error('Polling timed out or invalid response format');
     }
     throw new Error('Polling timed out');
-  }
   //POLLING HELP
 
   useEffect(() => {
