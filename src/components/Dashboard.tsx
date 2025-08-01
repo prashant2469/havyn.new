@@ -88,55 +88,48 @@ export function Dashboard() {
         throw new Error('Poll did not return valid JSON: ' + pollText);
       }
   
-      // Calculate progress based on attempts
-      const progress = (attempts / maxAttempts) * 100;
-      setGeneratingProgress(progress); // Update progress based on attempts
-      
-      // Handle "processing" status first!
-      if (
-        (data && data.status === "processing") ||
-        (data.body && typeof data.body === "string" && data.body.includes('"status":"processing"'))
-      ) {
-        console.log('Polling: still processing...');
-        await new Promise(r => setTimeout(r, intervalMs)); // Wait before retrying
-        attempts++;
-        continue;
-      }
-  
-      // If status is "complete", return the result
+      // Check for Lambda Proxy structure: body is a JSON string
       if (data && typeof data.body === 'string') {
         try {
           const body = JSON.parse(data.body);
-          // This is the new recommended format!
+  
+          // Main success path
           if (body.status === "complete" && Array.isArray(body.results)) {
             return body.results;
           }
-          // Still support the "processing" status
+          // Still processing
           if (body.status === "processing") {
             await new Promise(r => setTimeout(r, intervalMs));
             attempts++;
             continue;
           }
         } catch (e) {
-          // Not a valid JSON object in body
           console.error('Failed to parse poll body as JSON object!', e, data.body);
           throw new Error("Invalid response format from backend: " + data.body);
         }
       }
   
-        // Return the valid result if it's an array
-        if (Array.isArray(resultArray)) {
-          return resultArray;
-        }
-  
-        console.log("INVALID RESPONSE: " + JSON.stringify(resultArray));
-        throw new Error("Invalid response format from backend: " + JSON.stringify(resultArray));
+      // API returned status 202, keep polling
+      if (data && data.statusCode === 202) {
+        await new Promise(r => setTimeout(r, intervalMs));
+        attempts++;
+        continue;
       }
   
-      // Handle cases where the backend response format is unexpected
-      throw new Error('Polling timed out or invalid response format');
+      // Defensive: If results are array at root, return them (shouldn't happen if backend is consistent)
+      if (data && Array.isArray(data.body)) {
+        return data.body;
+      }
+      if (Array.isArray(data)) {
+        return data;
+      }
+  
+      // Unexpected structure, keep polling
+      await new Promise(r => setTimeout(r, intervalMs));
+      attempts++;
     }
     throw new Error('Polling timed out');
+  }
   //POLLING HELP
 
   useEffect(() => {
