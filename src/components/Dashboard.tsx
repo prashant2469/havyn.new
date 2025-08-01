@@ -104,17 +104,25 @@ export function Dashboard() {
       }
   
       // If status is "complete", return the result
-      if (data && data.status === "complete") {
-        let resultArray = data;
-        if (data && typeof data.body === "string") {
-          try {
-            resultArray = JSON.parse(data.body);
-            console.log('Parsed poll body as array:', resultArray);
-          } catch (e) {
-            console.error('Failed to parse poll body!', e, data.body);
-            throw new Error("Invalid response format from backend: " + data.body);
+      if (data && typeof data.body === 'string') {
+        try {
+          const body = JSON.parse(data.body);
+          // This is the new recommended format!
+          if (body.status === "complete" && Array.isArray(body.results)) {
+            return body.results;
           }
+          // Still support the "processing" status
+          if (body.status === "processing") {
+            await new Promise(r => setTimeout(r, intervalMs));
+            attempts++;
+            continue;
+          }
+        } catch (e) {
+          // Not a valid JSON object in body
+          console.error('Failed to parse poll body as JSON object!', e, data.body);
+          throw new Error("Invalid response format from backend: " + data.body);
         }
+      }
   
         // Return the valid result if it's an array
         if (Array.isArray(resultArray)) {
