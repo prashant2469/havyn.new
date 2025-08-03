@@ -1,3 +1,123 @@
+import React, { useMemo, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+
+const propertyLatLng = {
+  // Optional: hardcode property locations here
+  // 'The Villas at Park Terrace': { latitude: 36.1, longitude: -80.2 },
+};
+
+export function LocationInsights({ insights }) {
+  // Group by property
+  const locationSummaries = useMemo(() => {
+    const groups = {};
+    for (const t of insights) {
+      if (!t.property) continue;
+      if (!groups[t.property]) groups[t.property] = [];
+      groups[t.property].push(t);
+    }
+    return Object.entries(groups).map(([property, tenants]) => {
+      const avgScore =
+        tenants.reduce((s, t) => s + (t.tenant_score || 0), 0) / tenants.length;
+      const totalRevenue = tenants.reduce(
+        (sum, t) =>
+          sum +
+          (typeof t.rent_amount === 'number'
+            ? t.rent_amount
+            : Number(t.rent_amount) || 0),
+        0
+      );
+      // Add hardcoded lat/lng if you want to show map markers
+      const latLng = propertyLatLng[property] || null;
+      return {
+        property,
+        units: tenants.length,
+        avgScore: Math.round(avgScore * 10) / 10,
+        totalRevenue,
+        lat: latLng?.latitude,
+        lng: latLng?.longitude,
+      };
+    });
+  }, [insights]);
+
+  // For map view: pick the first valid lat/lng or fallback
+  const mapCenter = useMemo(() => {
+    const withCoords = locationSummaries.find(
+      l => typeof l.lat === 'number' && typeof l.lng === 'number'
+    );
+    return withCoords
+      ? [withCoords.lat, withCoords.lng]
+      : [35.7596, -79.0193]; // Default: North Carolina center
+  }, [locationSummaries]);
+
+  return (
+    <div className="space-y-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {locationSummaries.map(loc => (
+          <div
+            key={loc.property}
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 flex flex-col gap-2"
+          >
+            <div className="flex justify-between items-center mb-2">
+              <div>
+                <h3 className="text-lg font-bold">{loc.property}</h3>
+                <div className="text-gray-500 text-sm">{loc.units} units</div>
+              </div>
+              <div className="text-right">
+                <div className="text-green-600 text-2xl font-bold">
+                  ${loc.totalRevenue.toLocaleString()}
+                </div>
+                <div className="text-xs text-gray-500">Total Revenue</div>
+              </div>
+            </div>
+            <div>
+              <div>
+                <span className="font-medium">Avg Score: </span>
+                <span
+                  className={
+                    loc.avgScore >= 80
+                      ? 'text-green-500'
+                      : loc.avgScore >= 60
+                      ? 'text-yellow-500'
+                      : 'text-red-500'
+                  }
+                >
+                  {loc.avgScore}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Map Example (optional, only if you have coordinates) */}
+      {locationSummaries.some(l => l.lat && l.lng) && (
+        <div className="h-96 w-full rounded-lg overflow-hidden shadow">
+          <MapContainer center={mapCenter} zoom={7} style={{ height: '100%', width: '100%' }}>
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; OpenStreetMap contributors'
+            />
+            {locationSummaries
+              .filter(l => l.lat && l.lng)
+              .map(l => (
+                <Marker position={[l.lat, l.lng]} key={l.property}>
+                  <Popup>
+                    <strong>{l.property}</strong>
+                    <br />
+                    Units: {l.units}
+                    <br />
+                    Total Revenue: ${l.totalRevenue.toLocaleString()}
+                  </Popup>
+                </Marker>
+              ))}
+          </MapContainer>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/*
 import React, { useState, useEffect, useMemo } from 'react';
 import { LocationInsight } from '../types';
 import { Building2, Loader2, TrendingUp, Users, Construction, ArrowUpRight, Brain, Search, MapPin, Newspaper, ArrowDown } from 'lucide-react';
@@ -313,7 +433,7 @@ export function LocationInsights({ insights }: LocationInsightsProps) {
 
   return (
     <div className="space-y-6">
-      {/* ...the rest of your UI remains unchanged... */}
     </div>
   );
 }
+*/
