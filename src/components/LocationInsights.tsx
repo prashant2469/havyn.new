@@ -1,14 +1,15 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
+// Map property name to latitude/longitude
 const propertyLatLng = {
-  // Optional: hardcode property locations here
-  // 'The Villas at Park Terrace': { latitude: 36.1, longitude: -80.2 },
+  // Add your properties here:
+  'The Villas at Park Terrace - 301 Walkertown Ave Winston Salem, NC 27105': { latitude: 36.1170555787963, longitude: -80.20638809515557}
 };
 
 export function LocationInsights({ insights }) {
-  // Group by property
+  // Group by property and summarize stats
   const locationSummaries = useMemo(() => {
     const groups = {};
     for (const t of insights) {
@@ -27,31 +28,32 @@ export function LocationInsights({ insights }) {
             : Number(t.rent_amount) || 0),
         0
       );
-      // Add hardcoded lat/lng if you want to show map markers
-      const latLng = propertyLatLng[property] || null;
+      // Use hardcoded lat/lng for the property if available
+      const latLng = propertyLatLng[property] || {};
       return {
         property,
         units: tenants.length,
         avgScore: Math.round(avgScore * 10) / 10,
         totalRevenue,
-        lat: latLng?.latitude,
-        lng: latLng?.longitude,
+        lat: latLng.latitude,
+        lng: latLng.longitude,
       };
     });
   }, [insights]);
 
-  // For map view: pick the first valid lat/lng or fallback
+  // For the map, pick first valid lat/lng or default (NC center)
   const mapCenter = useMemo(() => {
     const withCoords = locationSummaries.find(
       l => typeof l.lat === 'number' && typeof l.lng === 'number'
     );
     return withCoords
       ? [withCoords.lat, withCoords.lng]
-      : [35.7596, -79.0193]; // Default: North Carolina center
+      : [35.7596, -79.0193];
   }, [locationSummaries]);
 
   return (
     <div className="space-y-8">
+      {/* Property cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {locationSummaries.map(loc => (
           <div
@@ -71,25 +73,23 @@ export function LocationInsights({ insights }) {
               </div>
             </div>
             <div>
-              <div>
-                <span className="font-medium">Avg Score: </span>
-                <span
-                  className={
-                    loc.avgScore >= 80
-                      ? 'text-green-500'
-                      : loc.avgScore >= 60
-                      ? 'text-yellow-500'
-                      : 'text-red-500'
-                  }
-                >
-                  {loc.avgScore}
-                </span>
-              </div>
+              <span className="font-medium">Avg Score: </span>
+              <span
+                className={
+                  loc.avgScore >= 80
+                    ? 'text-green-500'
+                    : loc.avgScore >= 60
+                    ? 'text-yellow-500'
+                    : 'text-red-500'
+                }
+              >
+                {loc.avgScore}
+              </span>
             </div>
           </div>
         ))}
       </div>
-      {/* Map Example (optional, only if you have coordinates) */}
+      {/* Interactive map */}
       {locationSummaries.some(l => l.lat && l.lng) && (
         <div className="h-96 w-full rounded-lg overflow-hidden shadow">
           <MapContainer center={mapCenter} zoom={7} style={{ height: '100%', width: '100%' }}>
@@ -107,15 +107,25 @@ export function LocationInsights({ insights }) {
                     Units: {l.units}
                     <br />
                     Total Revenue: ${l.totalRevenue.toLocaleString()}
+                    <br />
+                    Avg Score: {l.avgScore}
                   </Popup>
                 </Marker>
               ))}
           </MapContainer>
         </div>
       )}
+      {!locationSummaries.some(l => l.lat && l.lng) && (
+        <div className="p-6 bg-gray-100 text-gray-600 rounded-lg text-center">
+          <p>
+            No property coordinates provided. Add entries to <code>propertyLatLng</code> above to see properties on the map.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
+
 
 /*
 import React, { useState, useEffect, useMemo } from 'react';
