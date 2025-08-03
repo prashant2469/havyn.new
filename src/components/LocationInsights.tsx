@@ -8,8 +8,6 @@ const propertyLatLng = {
   'The Villas at Park Terrace - 301 Walkertown Ave Winston Salem, NC 27105': { latitude: 36.1170555787963, longitude: -80.20638809515557}
 };
 
-const mapZoom = {locationSummaries.length === 1 ? 16 : 12};
-
 export function LocationInsights({ insights }) {
   // Group by property and summarize stats
   const locationSummaries = useMemo(() => {
@@ -53,6 +51,8 @@ export function LocationInsights({ insights }) {
       : [35.7596, -79.0193];
   }, [locationSummaries]);
 
+  const mapZoom = locationSummaries.length === 1 ? 16 : 12;
+  
   return (
     <div className="space-y-8">
       {/* Property cards */}
