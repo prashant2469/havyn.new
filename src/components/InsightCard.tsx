@@ -138,10 +138,23 @@ export function InsightCard({ insight, allInsights = [] }: InsightCardProps) {
   };
 
   const handleViewHistory = async () => {
-    if (!showHistory) {
-      await fetchTenantHistory();
+    setLoading(true);
+    // All job insights are available, filter by matching property/unit/tenant
+    if (allInsights && allInsights.length > 0) {
+      const history = allInsights.filter(i =>
+        i.property === insight.property &&
+        i.unit === insight.unit &&
+        i.tenant_name === insight.tenant_name
+      );
+      setTenantHistory(history);
+      setShowHistory(true);
+      setLoading(false);
+    } else {
+      // Fallback: show just this insight
+      setTenantHistory([insight]);
+      setShowHistory(true);
+      setLoading(false);
     }
-    setShowHistory(true);
   };
   
   console.log("Insight data:", insight);  // Log each individual insight
