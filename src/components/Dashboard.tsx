@@ -63,51 +63,33 @@ export function Dashboard() {
   } | null>(null);
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
- const pollForResults = async (job_id: string) => {
+const pollForResults = async (job_id: string) => {
   const maxAttempts = 60;
   const intervalMs = 5000;
   const accountId = user?.id ?? null;
 
-  // 1) Use the correct route name: get_results (underscore), not get-result
-  // 2) Build URL with account_id when available
+  const apiBase = "https://zv54onyhgk.execute-api.us-west-1.amazonaws.com/prod";
+
   const getResultUrl = accountId
-    ? `https://dy7d1mkqgd.execute-api.us-west-1.amazonaws.com/prod/get_results?job_id=${job_id}&account_id=${accountId}`
-    : `https://dy7d1mkqgd.execute-api.us-west-1.amazonaws.com/prod/get_results?job_id=${job_id}`;
+    ? `${apiBase}/get_results?job_id=${encodeURIComponent(job_id)}&account_id=${encodeURIComponent(accountId)}`
+    : `${apiBase}/get_results?job_id=${encodeURIComponent(job_id)}`;
 
   let attempts = 0;
-
   while (attempts < maxAttempts) {
-    // 3) Keep request "simple": drop custom headers entirely
-    const res = await fetch(getResultUrl);
-
-    const pollText = await res.text();
-    console.log('Polling: raw response text:', pollText);
+    const res = await fetch(getResultUrl, { headers: { Accept: "application/json" } });
+    const text = await res.text();
+    console.log("Polling raw:", text);
 
     let data;
-    try {
-      data = JSON.parse(pollText);
-      console.log('Polling: parsed JSON:', data);
-    } catch (e) {
-      console.error('Polling: failed to parse JSON!', e, pollText);
-      throw new Error('Poll did not return valid JSON: ' + pollText);
-    }
+    try { data = JSON.parse(text); } catch { throw new Error("Poll did not return valid JSON: " + text); }
 
-    // Lambda already returns a flat JSON (status/results)
-    if (res.status === 200 && data?.status === 'complete' && Array.isArray(data.results)) {
-      return data.results;
-    }
-    if (res.status === 202 || data?.status === 'processing') {
-      await new Promise(r => setTimeout(r, intervalMs));
-      attempts++;
-      continue;
-    }
+    if (res.status === 200 && data?.status === "complete" && Array.isArray(data.results)) return data.results;
+    if (res.status === 202 || data?.status === "processing") { await new Promise(r => setTimeout(r, intervalMs)); attempts++; continue; }
 
-    // Unexpected — retry loop
     await new Promise(r => setTimeout(r, intervalMs));
     attempts++;
   }
-
-  throw new Error('Polling timed out');
+  throw new Error("Polling timed out");
 };
   //POLLING HELP
 
