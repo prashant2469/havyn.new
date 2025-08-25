@@ -56,198 +56,52 @@ export function Dashboard() {
     changedRows: number;
     changes: Array<{
       tenant: string;
-      property: string;
-      unit: string;
-      changes: Record<string, { old: any; new: any }>;
-    }>;
-  } | null>(null);
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
   const pollForResults = async (job_id: string) => {
-    const maxAttempts = 60;
-    const intervalMs = 5000;
-    const getResultUrl = `https://dy7d1mkqgd.execute-api.us-west-1.amazonaws.com/prod/get-result?job_id=${job_id}`;
-    
-    let attempts = 0;
-  
-    while (attempts < maxAttempts) {
-      const res = await fetch(getResultUrl, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${anonKey}`
-        }
-      });
-  
-      const pollText = await res.text();
-      console.log('Polling: raw response text:', pollText);
-  
-      let data;
-      try {
-        data = JSON.parse(pollText);
-        console.log('Polling: parsed JSON:', data);
-      } catch (e) {
-        console.error('Polling: failed to parse JSON!', e, pollText);
-        throw new Error('Poll did not return valid JSON: ' + pollText);
-      }
-  
-      // Check for Lambda Proxy structure: body is a JSON string
-      if (data && typeof data.body === 'string') {
-        try {
-          const body = JSON.parse(data.body);
-  
-          // Main success path
-          if (body.status === "complete" && Array.isArray(body.results)) {
-            return body.results;
-          }
-          // Still processing
-          if (body.status === "processing") {
-            await new Promise(r => setTimeout(r, intervalMs));
-            attempts++;
-            continue;
-          }
-        } catch (e) {
-          console.error('Failed to parse poll body as JSON object!', e, data.body);
-          throw new Error("Invalid response format from backend: " + data.body);
-        }
-      }
-  
-      // API returned status 202, keep polling
-      if (data && data.statusCode === 202) {
-        await new Promise(r => setTimeout(r, intervalMs));
-        attempts++;
-        continue;
-      }
-  
-      if (data && Array.isArray(data.body)) {
-        return data.body;
-      }
-      if (Array.isArray(data)) {
-        return data;
-      }
-  
-      // Unexpected structure, keep polling
+  const maxAttempts = 60;
+  const intervalMs = 5000;
+  const accountId = user?.id ?? null;
+
+  // 1) Use the correct route name: get_results (underscore), not get-result
+  // 2) Build URL with account_id when available
+  const getResultUrl = accountId
+    ? `https://dy7d1mkqgd.execute-api.us-west-1.amazonaws.com/prod/get_results?job_id=${job_id}&account_id=${accountId}`
+    : `https://dy7d1mkqgd.execute-api.us-west-1.amazonaws.com/prod/get_results?job_id=${job_id}`;
+
+  let attempts = 0;
+
+  while (attempts < maxAttempts) {
+    // 3) Keep request "simple": drop custom headers entirely
+    const res = await fetch(getResultUrl);
+
+    const pollText = await res.text();
+    console.log('Polling: raw response text:', pollText);
+
+    let data;
+    try {
+      data = JSON.parse(pollText);
+      console.log('Polling: parsed JSON:', data);
+    } catch (e) {
+      console.error('Polling: failed to parse JSON!', e, pollText);
+      throw new Error('Poll did not return valid JSON: ' + pollText);
+    }
+
+    // Lambda already returns a flat JSON (status/results)
+    if (res.status === 200 && data?.status === 'complete' && Array.isArray(data.results)) {
+      return data.results;
+    }
+    if (res.status === 202 || data?.status === 'processing') {
       await new Promise(r => setTimeout(r, intervalMs));
       attempts++;
+      continue;
     }
-    throw new Error('Polling timed out');
-  };
-  //POLLING HELP
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isGenerating && generatingProgress < 95) {
-      interval = setInterval(() => {
-        setGeneratingProgress(prev => {
-          const increment = Math.random() * 15;
-          const newProgress = prev + increment;
-          return newProgress > 95 ? 95 : newProgress;
-        });
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isGenerating, generatingProgress]);
+    // Unexpected — retry loop
+    await new Promise(r => setTimeout(r, intervalMs));
+    attempts++;
+  }
 
-  useEffect(() => {
-    if (insights.length > 0) {
-      const properties = insights.map(insight => insight.property);
-      setExpandedProperties(new Set(properties));
-      setAllExpanded(true);
-    }
-  }, [insights]);
-
-  const handleFileSelect = (newFiles: { [key: string]: File }) => {
-    if (newFiles.combined) {
-      setFiles({ combined: newFiles.combined });
-    } else {
-      const { combined, ...existingFiles } = files;
-      setFiles({ ...existingFiles, ...newFiles });
-    }
-    setError(null);
-  };
-
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => {
-        const base64String = reader.result as string;
-        const base64Content = base64String.split(',')[1];
-        resolve(base64Content);
-      };
-      reader.onerror = (error) => reject(error);
-    });
-  };
-
-  const fetchSavedInsights = async () => {
-    if (!user) return;
-    
-    setLoading(true);
-    setError(null);
-    setShowSavedInsights(true);
-    setShowUploadSection(false);
-    setMergedData([]);
-    setInsights([]);
-    setShowPreview(false);
-    setGeneratingProgress(0);
-    setRequestData(null);
-    setDebugData(null);
-    
-    try {
-      // First get the latest report
-      const { data: latestReport, error: reportError } = await supabase
-        .from('insight_reports')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('is_latest', true)
-        .single();
-
-      if (reportError) throw reportError;
-
-      if (!latestReport) {
-        setError('No previous insights found for your account');
-        return;
-      }
-
-      // Then get all insights from that report
-      const { data, error: insightsError } = await supabase
-        .from('tenant_insights')
-        .select('*')
-        .eq('report_id', latestReport.id)
-        .order('created_at', { ascending: false });
-
-      if (insightsError) throw insightsError;
-
-      if (!data || data.length === 0) {
-        setError('No previous insights found for your account');
-        return;
-      }
-
-      setInsights(data);
-    } catch (error) {
-      console.error('Error fetching saved insights:', error);
-      setError(error instanceof Error ? error.message : 'Error fetching saved insights');
-      setInsights([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const mergeFiles = async () => {
-    if (files.combined) {
-      if (!files.combined) {
-        setError('Please upload the combined report file');
-        return;
-      }
-    } else {
-      if (!files.delinquency || !files.rentRoll || !files.directory) {
-        setError('Please upload all three files or a combined report file');
-        return;
-      }
-    }
-  
-    setLoading(true);
+  throw new Error('Polling timed out');
+};rue);
     setError(null);
     setShowSavedInsights(false);
     setInsights([]);
