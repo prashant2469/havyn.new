@@ -399,14 +399,16 @@ const pollForResults = async (job_id: string, accountIdForJob: string | null) =>
           }
         });
 
-        if (hasChanges) {
-          changedCount++;
-          changes.push({
-            tenant: newRow.tenant,
-            property: newRow.property,
-            unit: newRow.unit,
-            changes: rowChanges
-          });
+          const pollResponse = await fetch(
+            `https://dy7d1mkqgd.execute-api.us-west-1.amazonaws.com/prod/get-results?job_id=${job_id}`,
+            {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Account-Id': user?.id || ''
+              }
+            }
+          );
           
           console.log(`Changes detected for ${newRow.tenant}:`, rowChanges);
         } else {
