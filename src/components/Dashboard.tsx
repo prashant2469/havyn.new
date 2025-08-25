@@ -595,6 +595,16 @@ if (!accountIdForJob && user?.id) {
   accountIdForJob = user.id;
 }
 
+const uploadResp = await fetch(presigned_url, {
+  method: "PUT",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(mergedData),
+});
+if (!uploadResp.ok) {
+  console.error("S3 upload failed:", uploadResp.status, await uploadResp.text());
+  throw new Error(`Failed to upload input.json to S3 (status ${uploadResp.status})`);
+}
+
 console.log('Polling with job_id:', job_id, 'accountIdForJob:', accountIdForJob);
 const results = await pollForResults(job_id, accountIdForJob);
       setGeneratingProgress(100);
