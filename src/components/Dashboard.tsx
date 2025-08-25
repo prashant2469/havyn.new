@@ -85,7 +85,7 @@ const pollForResults = async (job_id: string, accountIdForJob: string | null) =>
       // ✅ keep request "simple": no custom headers unless needed
       res = await fetch(url, { headers: { Accept: "application/json" } });
     } catch (e) {
-      // If you land here, it’s a network/CORS/URL problem
+      // If you land here, it's a network/CORS/URL problem
       console.error("❌ POLL fetch failed (network/CORS):", e, "POLL URL:", url);
       throw e;
     }
@@ -399,17 +399,14 @@ const pollForResults = async (job_id: string, accountIdForJob: string | null) =>
           }
         });
 
-        const pollForResults = async () => {
-            `https://dy7d1mkqgd.execute-api.us-west-1.amazonaws.com/prod/get-results?job_id=${job_id}`,
-            {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Account-Id': user?.id || ''
-              }
-            }
-          );
-          
+        if (hasChanges) {
+          changes.push({
+            tenant: newRow.tenant,
+            property: newRow.property,
+            unit: newRow.unit,
+            changes: rowChanges
+          });
+          changedCount++;
           console.log(`Changes detected for ${newRow.tenant}:`, rowChanges);
         } else {
           unchangedCount++;
