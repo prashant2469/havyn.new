@@ -545,7 +545,11 @@ const pollForResults = async (job_id: string, accountIdForJob: string | null) =>
 
       const resp = await fetch(
         "https://dy7d1mkqgd.execute-api.us-west-1.amazonaws.com/prod/presigned-upload-url",
-        { method: "POST", headers: { "Content-Type": "application/json" } }
+        { 
+          method: "POST", 
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ "accountId": user?.id })
+        }
       );
       if (!resp.ok) throw new Error("Failed to get presigned S3 URL");
       //const { presigned_url, job_id } = await resp.json();
