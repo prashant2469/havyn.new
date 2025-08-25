@@ -356,7 +356,7 @@ const pollForResults = async (job_id: string, accountIdForJob: string | null) =>
       let changedCount = 0;
 
       // Compare each new row with existing data
-      newData.forEach(newRow => {
+      newData.forEach(async newRow => {
         const key = `${newRow.property}-${newRow.unit}-${newRow.tenant}`;
         const existingRow = existingDataMap.get(key);
 
