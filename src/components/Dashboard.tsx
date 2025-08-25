@@ -63,7 +63,7 @@ export function Dashboard() {
   } | null>(null);
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const pollForResults = async (job_id: string) => {
+const pollForResults = async (job_id: string, accountIdForJob: string | null) => {
   const maxAttempts = 60;
   const intervalMs = 5000;
   const accountId = user?.id ?? null;
