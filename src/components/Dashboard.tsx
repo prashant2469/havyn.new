@@ -63,7 +63,7 @@ export function Dashboard() {
   } | null>(null);
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const pollForResults = async (job_id: string, accountIdForJob: string | null) => {
+const pollForResults = async (job_id: string, accountIdForJob: string | null, s3_key?: string) => {
   const maxAttempts = 60;
   const intervalMs = 5000;
   const apiBase = "https://zv54onyhgk.execute-api.us-west-1.amazonaws.com/prod";
@@ -596,7 +596,7 @@ if (!accountIdForJob && user?.id) {
 }
 
 console.log('Polling with job_id:', job_id, 'accountIdForJob:', accountIdForJob);
-const results = await pollForResults(job_id, accountIdForJob);
+const results = await pollForResults(job_id, accountIdForJob, s3_key);
       setGeneratingProgress(100);
   
       setTimeout(() => {
