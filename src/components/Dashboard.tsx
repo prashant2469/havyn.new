@@ -63,9 +63,8 @@ export function Dashboard() {
   } | null>(null);
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-  // POLLING HELP
-  async function pollForResults(jobId, maxAttempts = 123, intervalMs = 12000) {
-    const getResultUrl = `${supabase.supabaseUrl}/functions/v1/get_results?job_id=${jobId}`;
+ c
+    
     let attempts = 0;
   
     while (attempts < maxAttempts) {
