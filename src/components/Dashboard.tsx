@@ -63,7 +63,10 @@ export function Dashboard() {
   } | null>(null);
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
- c
+  const pollForResults = async (job_id: string) => {
+    const maxAttempts = 60;
+    const intervalMs = 5000;
+    const getResultUrl = `https://dy7d1mkqgd.execute-api.us-west-1.amazonaws.com/prod/get-result?job_id=${job_id}`;
     
     let attempts = 0;
   
@@ -115,7 +118,6 @@ export function Dashboard() {
         continue;
       }
   
-          const pollResponse = await fetch(`${supabaseUrl}/functions/v1/generate-insights?job_id=${job_id}`, {
       if (data && Array.isArray(data.body)) {
         return data.body;
       }
@@ -128,7 +130,7 @@ export function Dashboard() {
       attempts++;
     }
     throw new Error('Polling timed out');
-  }
+  };
   //POLLING HELP
 
   useEffect(() => {
@@ -401,8 +403,7 @@ export function Dashboard() {
           if (typeof newValue === 'number' && typeof oldValue === 'number') {
             if (Math.abs(newValue - oldValue) > 0.01) {
               rowChanges[field] = { old: oldValue, new: newValue };
-              'Content-Type': 'application/json',
-              'X-Account-Id': user?.id || ''
+              hasChanges = true;
             }
           } else if (String(newValue).trim() !== String(oldValue).trim()) {
             rowChanges[field] = { old: oldValue, new: newValue };
@@ -419,7 +420,7 @@ export function Dashboard() {
             changes: rowChanges
           });
           
-          console.log(`Changes detected for ${newRow.tenant}:, rowChanges`);
+          console.log(`Changes detected for ${newRow.tenant}:`, rowChanges);
         } else {
           unchangedCount++;
           console.log(`No changes for ${newRow.tenant} - skipping`);
@@ -480,17 +481,17 @@ export function Dashboard() {
       
       setRequestData(JSON.stringify(requestBody, null, 2));
 
-      const response = await fetch(${supabase.supabaseUrl}/functions/v1/generate-insights, {
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/generate-insights`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': Bearer ${supabase.supabaseKey}
+          'Authorization': `Bearer ${supabase.supabaseKey}`
         },
         body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
-        throw new Error(HTTP error! status: ${response.status});
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
@@ -776,6 +777,15 @@ export function Dashboard() {
 
   const handleTenantClick = (tenant: TenantInsight) => {
     setSelectedTenant(tenant);
+  };
+
+  const handlePropertySort = (field: SortField) => {
+    if (propertySortField === field) {
+      setPropertySortOrder(propertySortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setPropertySortField(field);
+      setPropertySortOrder('asc');
+    }
   };
 
   const filterAndSortProperties = () => {
@@ -1087,7 +1097,7 @@ export function Dashboard() {
             <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-[#3F6B28] dark:bg-green-400 rounded-full transition-all duration-300"
-                style={{ width: `${generatingProgress}% `}}
+                style={{ width: `${generatingProgress}%` }}
               />
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -1255,7 +1265,7 @@ export function Dashboard() {
                   <div className="mb-6">
                     <div className="flex justify-between items-center mb-4">
                       <h2 className="text-xl font-semibold text-[#3F6B28] dark:text-green-400 whitespace-nowrap">
-                        {showSavedInsights ? 'Save Insights' : 'Property Insights'}
+                        {showSavedInsights ? 'Saved Insights' : 'Property Insights'}
                       </h2>
                     </div>
           
