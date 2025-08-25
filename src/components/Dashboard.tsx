@@ -66,30 +66,60 @@ export function Dashboard() {
 const pollForResults = async (job_id: string, accountIdForJob: string | null) => {
   const maxAttempts = 60;
   const intervalMs = 5000;
-  const accountId = user?.id ?? null;
-
   const apiBase = "https://zv54onyhgk.execute-api.us-west-1.amazonaws.com/prod";
 
-const getResultUrl = accountIdForJob
-  ? `${apiBase}/get_results?job_id=${encodeURIComponent(job_id)}&account_id=${encodeURIComponent(accountIdForJob)}`
-  : `${apiBase}/get_results?job_id=${encodeURIComponent(job_id)}`;
+  const jid = encodeURIComponent(job_id);
+  const getResultUrl = accountIdForJob && String(accountIdForJob).trim()
+    ? `${apiBase}/get_results?job_id=${jid}&account_id=${encodeURIComponent(accountIdForJob)}`
+    : `${apiBase}/get_results?job_id=${jid}`;
+
+  console.log("POLL URL:", getResultUrl);
 
   let attempts = 0;
   while (attempts < maxAttempts) {
-    console.log("POLL URL:", getResultUrl);
     const res = await fetch(getResultUrl, { headers: { Accept: "application/json" } });
     const text = await res.text();
-    console.log("Polling raw:", text);
 
-    let data;
-    try { data = JSON.parse(text); } catch { throw new Error("Poll did not return valid JSON: " + text); }
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error("Poll did not return valid JSON: " + text);
+    }
 
-    if (res.status === 200 && data?.status === "complete" && Array.isArray(data.results)) return data.results;
-    if (res.status === 202 || data?.status === "processing") { await new Promise(r => setTimeout(r, intervalMs)); attempts++; continue; }
+    // --- IMPORTANT: unwrap Lambda-proxy envelopes if present ---
+    // default: use real HTTP status and parsed data
+    let status = res.status;
+    let payload = data;
 
-    await new Promise(r => setTimeout(r, intervalMs));
+    // if the body contains {statusCode, headers, body: "..."} then unwrap
+    if (typeof data?.statusCode === "number" && data?.body !== undefined) {
+      status = data.statusCode;
+      payload = typeof data.body === "string" ? JSON.parse(data.body) : data.body;
+    }
+
+    console.log("Poll status:", status, "payload:", payload);
+
+    if (status === 200 && payload?.status === "complete" && Array.isArray(payload.results)) {
+      return payload.results;
+    }
+
+    if (status === 202 || payload?.status === "processing") {
+      await new Promise((r) => setTimeout(r, intervalMs));
+      attempts++;
+      continue;
+    }
+
+    // Surface real errors rather than looping
+    if (status >= 400) {
+      throw new Error(`get_results error ${status}: ${text}`);
+    }
+
+    // Unexpected shape—retry briefly
+    await new Promise((r) => setTimeout(r, intervalMs));
     attempts++;
   }
+
   throw new Error("Polling timed out");
 };
   //POLLING HELP
