@@ -70,12 +70,13 @@ const pollForResults = async (job_id: string) => {
 
   const apiBase = "https://zv54onyhgk.execute-api.us-west-1.amazonaws.com/prod";
 
-  const getResultUrl = accountId
-    ? `${apiBase}/get_results?job_id=${encodeURIComponent(job_id)}&account_id=${encodeURIComponent(accountId)}`
-    : `${apiBase}/get_results?job_id=${encodeURIComponent(job_id)}`;
+const getResultUrl = accountIdForJob
+  ? `${apiBase}/get_results?job_id=${encodeURIComponent(job_id)}&account_id=${encodeURIComponent(accountIdForJob)}`
+  : `${apiBase}/get_results?job_id=${encodeURIComponent(job_id)}`;
 
   let attempts = 0;
   while (attempts < maxAttempts) {
+    console.log("POLL URL:", getResultUrl);
     const res = await fetch(getResultUrl, { headers: { Accept: "application/json" } });
     const text = await res.text();
     console.log("Polling raw:", text);
@@ -547,22 +548,24 @@ const pollForResults = async (job_id: string) => {
         return;
       }
       
-      const { presigned_url, job_id, s3_key } = data;
+const { presigned_url, job_id, s3_key } = data;
 
-      // --- NEW: Upload mergedData to S3 using presigned URL ---
-      const uploadResp = await fetch(presigned_url, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(mergedData)
-      });
-      if (!uploadResp.ok) throw new Error("Failed to upload input.json to S3");
-      console.log('S3 upload response:', uploadResp);
-      // --- END NEW ---
-  
-      setGeneratingProgress(10);
-  
-      // --- NEW: Poll for results ---
-      console.log('Polling for results with job_id:', job_id);
+// Prefer explicit account_id if presign ever returns it
+let accountIdForJob: string | null =
+  (data.account_id ?? data.accountId ?? null) as string | null;
+
+// If presign returns a tenant-scoped key, extract it: tenant_jobs/{accountId}/{jobId}/input.json
+if (!accountIdForJob && typeof s3_key === 'string' && s3_key.startsWith('tenant_jobs/')) {
+  const parts = s3_key.split('/'); // ["tenant_jobs", maybeAccountIdOrJobId, maybeJobId, "input.json"]
+  if (parts.length >= 4) accountIdForJob = parts[1]; // tenant-scoped
+}
+
+// FINAL FALLBACK: if still null, use the signed-in user id (often equals the account id)
+if (!accountIdForJob && user?.id) {
+  accountIdForJob = user.id;
+}
+
+console.log('Polling with job_id:', job_id, 'accountIdForJob:', accountIdForJob);
       const results = await pollForResults(job_id);
       setGeneratingProgress(100);
   
