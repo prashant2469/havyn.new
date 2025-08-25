@@ -62,61 +62,58 @@ export function Dashboard() {
     }>;
   } | null>(null);
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
+  
+const API_BASE = "https://zv54onyhgk.execute-api.us-west-1.amazonaws.com/prod";
+  
 const pollForResults = async (job_id: string, accountIdForJob: string | null) => {
   const maxAttempts = 60;
   const intervalMs = 5000;
-  const apiBase = "https://zv54onyhgk.execute-api.us-west-1.amazonaws.com/prod";
 
-  const jid = encodeURIComponent(job_id);
-  const getResultUrl = accountIdForJob && String(accountIdForJob).trim()
-    ? `${apiBase}/get_results?job_id=${jid}&account_id=${encodeURIComponent(accountIdForJob)}`
-    : `${apiBase}/get_results?job_id=${jid}`;
+  // ✅ ALWAYS construct the query string with URLSearchParams
+  const params = new URLSearchParams();
+  params.set("job_id", job_id);
+  if (accountIdForJob) params.set("account_id", accountIdForJob);
 
-  console.log("POLL URL:", getResultUrl);
+  const url = `${API_BASE}/get_results?${params.toString()}`;
+  console.log("POLL URL:", url);
 
   let attempts = 0;
+
   while (attempts < maxAttempts) {
-    const res = await fetch(getResultUrl, { headers: { Accept: "application/json" } });
-    const text = await res.text();
-
-    let data: any;
+    let res: Response;
     try {
-      data = JSON.parse(text);
-    } catch {
-      throw new Error("Poll did not return valid JSON: " + text);
+      // ✅ keep request "simple": no custom headers unless needed
+      res = await fetch(url, { headers: { Accept: "application/json" } });
+    } catch (e) {
+      // If you land here, it’s a network/CORS/URL problem
+      console.error("❌ POLL fetch failed (network/CORS):", e, "POLL URL:", url);
+      throw e;
     }
 
-    // --- IMPORTANT: unwrap Lambda-proxy envelopes if present ---
-    // default: use real HTTP status and parsed data
-    let status = res.status;
-    let payload = data;
+    // If you get here, we have an HTTP status (200/202/etc)
+    let payloadText = await res.text();
+    console.log("Poll raw:", payloadText);
 
-    // if the body contains {statusCode, headers, body: "..."} then unwrap
-    if (typeof data?.statusCode === "number" && data?.body !== undefined) {
-      status = data.statusCode;
-      payload = typeof data.body === "string" ? JSON.parse(data.body) : data.body;
+    let payload: any;
+    try {
+      payload = JSON.parse(payloadText);
+    } catch (e) {
+      console.error("❌ Poll JSON parse failed:", e, payloadText);
+      throw new Error("Poll did not return valid JSON");
     }
 
-    console.log("Poll status:", status, "payload:", payload);
-
-    if (status === 200 && payload?.status === "complete" && Array.isArray(payload.results)) {
+    if (res.status === 200 && payload?.status === "complete" && Array.isArray(payload.results)) {
       return payload.results;
     }
 
-    if (status === 202 || payload?.status === "processing") {
-      await new Promise((r) => setTimeout(r, intervalMs));
+    if (res.status === 202 || payload?.status === "processing") {
+      await new Promise(r => setTimeout(r, intervalMs));
       attempts++;
       continue;
     }
 
-    // Surface real errors rather than looping
-    if (status >= 400) {
-      throw new Error(`get_results error ${status}: ${text}`);
-    }
-
-    // Unexpected shape—retry briefly
-    await new Promise((r) => setTimeout(r, intervalMs));
+    // unexpected: backoff and retry
+    await new Promise(r => setTimeout(r, intervalMs));
     attempts++;
   }
 
