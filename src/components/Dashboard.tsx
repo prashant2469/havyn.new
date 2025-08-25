@@ -14,8 +14,9 @@ import {
   Loader2, History, Building2, AlertTriangle, Users, TrendingUp, 
   ArrowUpRight, FileX, Upload, FileCheck, Eye, Brain, Bug, 
   ChevronDown, ChevronUp, DollarSign, Clock, AlertCircle,
-  ArrowUpDown, Search
+  ArrowUpDown, Search, ChevronRight
 } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
 type SortField = 'property' | 'units' | 'score' | 'risk' | 'delinquency';
 type SortOrder = 'asc' | 'desc';
@@ -177,6 +178,7 @@ type SavedRun = {
 
 const [savedRuns, setSavedRuns] = useState<SavedRun[]>([]);
 const [loadingSaved, setLoadingSaved] = useState(false);
+const [showSavedRunsList, setShowSavedRunsList] = useState(false);
 
 const loadSavedRun = async (jobId: string, accountId: string) => {
   const params = new URLSearchParams();
@@ -254,19 +256,8 @@ const fetchSavedInsights = async () => {
       return;
     }
 
-    // 2) Auto-load the most recent run (list is already sorted newest-first in Lambda)
-    const latest = items[0];
-    const results = await loadSavedRun(latest.job_id, user.id);
-
-    // 3) Map to your UI structure (keep your existing mapping)
-    const formatted = results.map((insight: any) => ({
-      ...insight,
-      score: typeof insight.tenant_score === "number" ? insight.tenant_score : 0,
-    }));
-
-    setInsights(formatted);
-    setGeneratingProgress(0);
-    setRequestData(null);
+    // Show the list of saved runs instead of auto-loading
+    setShowSavedRunsList(true);
   } catch (err: any) {
     console.error("Error fetching saved insights from S3:", err);
     setError(err?.message || "Error fetching saved insights");
@@ -1207,6 +1198,87 @@ const results = await pollForResults(job_id, accountIdForJob);
         </div>
       )}
 
+      {/* Saved Runs List View */}
+      {showSavedRunsList && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-[#3F6B28] dark:text-green-400">
+              Saved Insight Reports
+            </h2>
+            <button
+              onClick={() => setShowSavedRunsList(false)}
+              className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+
+          {savedRuns.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-gray-500 dark:text-gray-400">
+                <Brain className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-medium mb-2">No Saved Reports</h3>
+                <p>Generate your first tenant insights to see them here.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {savedRuns.map((report) => (
+                <div
+                  key={report.job_id}
+                  className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={async () => {
+                    setShowSavedRunsList(false);
+                    const results = await loadSavedRun(report.job_id, user?.id || '');
+                    const formattedInsights = results.map(insight => ({
+                      ...insight,
+                      score: typeof insight.tenant_score === 'number' ? insight.tenant_score : 0,
+                    }));
+                    setInsights(formattedInsights);
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-[#3F6B28] bg-opacity-10 dark:bg-opacity-20 rounded-lg flex items-center justify-center">
+                        <Brain className="w-6 h-6 text-[#3F6B28] dark:text-green-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          Insight Report
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Generated on {new Date(report.last_modified).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      <span>Job ID: {report.job_id.slice(0, 8)}...</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      <span>{formatDistanceToNow(new Date(report.last_modified), { addSuffix: true })}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {error && showSavedInsights && !insights.length && (
         <div className="flex flex-col items-center justify-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
           <FileX className="w-16 h-16 text-gray-400 mb-4" />
@@ -1224,7 +1296,7 @@ const results = await pollForResults(job_id, accountIdForJob);
         </div>
       )}
 
-      {stats && (
+      {stats && !showSavedRunsList && (
         <div className="space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <MetricCard
