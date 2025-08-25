@@ -54,7 +54,7 @@ export function LandingPage() {
 
       // For now, we'll use a simple fetch to a form submission service
       // You can replace this with EmailJS, Formspree, or your own email service
-      const response = await fetch('https://formspree.io/f/YOUR_FORM_ID', {
+      const response = await fetch('https://formspree.io/f/mvgbogzv', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
