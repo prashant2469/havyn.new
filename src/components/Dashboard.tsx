@@ -399,7 +399,7 @@ const pollForResults = async (job_id: string, accountIdForJob: string | null) =>
           }
         });
 
-          const pollResponse = await fetch(
+        const pollForResults = async () => {
             `https://dy7d1mkqgd.execute-api.us-west-1.amazonaws.com/prod/get-results?job_id=${job_id}`,
             {
               method: 'GET',
