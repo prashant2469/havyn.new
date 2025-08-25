@@ -9,11 +9,57 @@ import {
   Moon,
   Upload,
   Users,
-  Home
+  Home,
+  X,
+  Calendar
 } from 'lucide-react';
 
 export function LandingPage() {
   const { isDarkMode, toggleDarkMode } = useTheme();
+  const [showDemoForm, setShowDemoForm] = React.useState(false);
+  const [formData, setFormData] = React.useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    company: '',
+    propertyType: ''
+  });
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [submitSuccess, setSubmitSuccess] = React.useState(false);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    // Simulate form submission
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    setIsSubmitting(false);
+    setSubmitSuccess(true);
+    
+    // Reset form after 3 seconds
+    setTimeout(() => {
+      setShowDemoForm(false);
+      setSubmitSuccess(false);
+      setFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        company: '',
+        propertyType: ''
+      });
+    }, 3000);
+  };
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
@@ -48,7 +94,7 @@ export function LandingPage() {
                 </Link>
               </div>
               <a
-                href="#demo"
+                onClick={() => setShowDemoForm(true)}
                 className="bg-havyn-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-havyn-dark transition-colors"
               >
                 Book a Free Demo
@@ -73,7 +119,7 @@ export function LandingPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              href="#demo"
+              onClick={() => setShowDemoForm(true)}
               className="bg-havyn-primary text-white px-8 py-4 rounded-lg text-lg font-medium hover:bg-havyn-dark transition-colors inline-flex items-center justify-center gap-2"
             >
               Book a Free Demo
@@ -270,7 +316,7 @@ export function LandingPage() {
             Book a free demo to see how Havyn can help you make better decisions.
           </p>
           <a
-            href="#demo"
+            onClick={() => setShowDemoForm(true)}
             className="bg-havyn-primary text-white px-8 py-4 rounded-lg text-lg font-medium hover:bg-havyn-dark transition-colors inline-flex items-center justify-center gap-2"
           >
             Book Your Free Demo
@@ -321,6 +367,179 @@ export function LandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* Demo Booking Modal */}
+      {showDemoForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-havyn-primary bg-opacity-10 dark:bg-opacity-20 rounded-lg flex items-center justify-center">
+                  <Calendar className="w-4 h-4 text-havyn-primary dark:text-green-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Book a Free Demo</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">See Havyn in action</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDemoForm(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form Content */}
+            <div className="p-6">
+              {submitSuccess ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Calendar className="w-8 h-8 text-green-600 dark:text-green-400" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                    Demo Requested!
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    Thank you for your interest. We'll contact you within 24 hours to schedule your personalized demo.
+                  </p>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        First Name *
+                      </label>
+                      <input
+                        type="text"
+                        id="firstName"
+                        name="firstName"
+                        required
+                        value={formData.firstName}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-havyn-primary focus:border-havyn-primary"
+                        placeholder="John"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Last Name *
+                      </label>
+                      <input
+                        type="text"
+                        id="lastName"
+                        name="lastName"
+                        required
+                        value={formData.lastName}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-havyn-primary focus:border-havyn-primary"
+                        placeholder="Doe"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Email Address *
+                    </label>
+                    <input
+                      type="email"
+                      id="email"
+                      name="email"
+                      required
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-havyn-primary focus:border-havyn-primary"
+                      placeholder="john@company.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Phone Number *
+                    </label>
+                    <input
+                      type="tel"
+                      id="phone"
+                      name="phone"
+                      required
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-havyn-primary focus:border-havyn-primary"
+                      placeholder="(555) 123-4567"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="company" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Company Name *
+                    </label>
+                    <input
+                      type="text"
+                      id="company"
+                      name="company"
+                      required
+                      value={formData.company}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-havyn-primary focus:border-havyn-primary"
+                      placeholder="Your Company"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="propertyType" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Property Type *
+                    </label>
+                    <select
+                      id="propertyType"
+                      name="propertyType"
+                      required
+                      value={formData.propertyType}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-havyn-primary focus:border-havyn-primary"
+                    >
+                      <option value="">Select Property Type</option>
+                      <option value="multifamily">Multifamily</option>
+                      <option value="single-family">Single Family</option>
+                      <option value="commercial">Commercial</option>
+                      <option value="mixed-use">Mixed Use</option>
+                      <option value="student-housing">Student Housing</option>
+                      <option value="senior-living">Senior Living</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  <div className="pt-4">
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full bg-havyn-primary text-white py-3 px-4 rounded-lg font-medium hover:bg-havyn-dark focus:outline-none focus:ring-2 focus:ring-havyn-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        <>
+                          <Calendar className="w-4 h-4" />
+                          Book Demo
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                    We'll contact you within 24 hours to schedule your personalized demo.
+                  </p>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
