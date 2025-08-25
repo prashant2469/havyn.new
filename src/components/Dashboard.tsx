@@ -115,7 +115,7 @@ export function Dashboard() {
         continue;
       }
   
-      // Defensive: If results are array at root, return them (shouldn't happen if backend is consistent)
+          const pollResponse = await fetch(`${supabaseUrl}/functions/v1/generate-insights?job_id=${job_id}`, {
       if (data && Array.isArray(data.body)) {
         return data.body;
       }
@@ -401,7 +401,8 @@ export function Dashboard() {
           if (typeof newValue === 'number' && typeof oldValue === 'number') {
             if (Math.abs(newValue - oldValue) > 0.01) {
               rowChanges[field] = { old: oldValue, new: newValue };
-              hasChanges = true;
+              'Content-Type': 'application/json',
+              'X-Account-Id': user?.id || ''
             }
           } else if (String(newValue).trim() !== String(oldValue).trim()) {
             rowChanges[field] = { old: oldValue, new: newValue };
