@@ -252,7 +252,7 @@ export function LandingPage() {
           </div>
           <div className="rounded-xl overflow-hidden shadow-2xl">
             <img
-              src="https://images.pexels.com/photos/7681078/pexels-photo-7681078.jpeg"
+              src="/Screen Shot 2025-08-25 at 3.43.48 PM.png"
               alt="Havyn Dashboard"
               className="w-full"
             />
