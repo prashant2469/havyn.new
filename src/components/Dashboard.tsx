@@ -168,6 +168,36 @@ const pollForResults = async (job_id: string, accountIdForJob: string | null) =>
     });
   };
 
+const loadSavedRun = async (jobId: string, accountId: string) => {
+  const params = new URLSearchParams();
+  params.set("job_id", jobId);
+  params.set("account_id", accountId);
+  params.set("nowait", "1"); // tell Lambda to NOT wait/poll S3
+
+  const url = `${API_BASE}/get_results?${params.toString()}`;
+  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  const text = await res.text();
+
+  let payload: any;
+  try {
+    payload = JSON.parse(text);
+  } catch (e) {
+    throw new Error(`Failed to parse get_results payload: ${text}`);
+  }
+
+  if (res.status === 200 && payload?.status === "complete" && Array.isArray(payload.results)) {
+    return payload.results as any[]; // your insight shape
+  }
+
+  // If for some reason the run isn't present (should be rare), fall back to polling:
+  if (res.status === 202 || payload?.status === "processing") {
+    return await pollForResults(jobId, accountId);
+  }
+
+  throw new Error(`Unexpected response loading saved run: ${text}`);
+};
+  
+
 const fetchSavedInsights = async () => {
   if (!user?.id) {
     setError("Please log in to view saved insights");
