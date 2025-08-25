@@ -168,59 +168,73 @@ const pollForResults = async (job_id: string, accountIdForJob: string | null) =>
     });
   };
 
-  const fetchSavedInsights = async () => {
-    if (!user) return;
-    
-    setLoading(true);
-    setError(null);
-    setShowSavedInsights(true);
-    setShowUploadSection(false);
-    setMergedData([]);
-    setInsights([]);
-    setShowPreview(false);
+const fetchSavedInsights = async () => {
+  if (!user?.id) {
+    setError("Please log in to view saved insights");
+    return;
+  }
+
+  setLoading(true);
+  setError(null);
+  setShowSavedInsights(true);
+  setShowUploadSection(false);
+  setMergedData([]);
+  setInsights([]);
+  setShowPreview(false);
+  setGeneratingProgress(0);
+  setRequestData(null);
+  setDebugData(null);
+
+  try {
+    // 1) list saved runs for this account
+    const params = new URLSearchParams();
+    params.set("action", "list");
+    params.set("account_id", user.id);
+
+    const url = `${API_BASE}/get_results?${params.toString()}`;
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    const text = await res.text();
+
+    let payload: any;
+    try {
+      payload = JSON.parse(text);
+    } catch (e) {
+      throw new Error(`Failed to parse list payload: ${text}`);
+    }
+
+    if (res.status !== 200 || !payload?.items || !Array.isArray(payload.items)) {
+      throw new Error(`List failed: ${text}`);
+    }
+
+    const items: SavedRun[] = payload.items;
+    setSavedRuns(items);
+
+    if (!items.length) {
+      setError("No previous insights found for your account");
+      return;
+    }
+
+    // 2) Auto-load the most recent run (list is already sorted newest-first in Lambda)
+    const latest = items[0];
+    const results = await loadSavedRun(latest.job_id, user.id);
+
+    // 3) Map to your UI structure (keep your existing mapping)
+    const formatted = results.map((insight: any) => ({
+      ...insight,
+      score: typeof insight.tenant_score === "number" ? insight.tenant_score : 0,
+    }));
+
+    setInsights(formatted);
     setGeneratingProgress(0);
     setRequestData(null);
-    setDebugData(null);
-    
-    try {
-      // First get the latest report
-      const { data: latestReport, error: reportError } = await supabase
-        .from('insight_reports')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('is_latest', true)
-        .single();
-
-      if (reportError) throw reportError;
-
-      if (!latestReport) {
-        setError('No previous insights found for your account');
-        return;
-      }
-
-      // Then get all insights from that report
-      const { data, error: insightsError } = await supabase
-        .from('tenant_insights')
-        .select('*')
-        .eq('report_id', latestReport.id)
-        .order('created_at', { ascending: false });
-
-      if (insightsError) throw insightsError;
-
-      if (!data || data.length === 0) {
-        setError('No previous insights found for your account');
-        return;
-      }
-
-      setInsights(data);
-    } catch (error) {
-      console.error('Error fetching saved insights:', error);
-      setError(error instanceof Error ? error.message : 'Error fetching saved insights');
-      setInsights([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (err: any) {
+    console.error("Error fetching saved insights from S3:", err);
+    setError(err?.message || "Error fetching saved insights");
+    setInsights([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const mergeFiles = async () => {
     if (files.combined) {
