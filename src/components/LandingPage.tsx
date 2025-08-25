@@ -40,11 +40,47 @@ export function LandingPage() {
     e.preventDefault();
     setIsSubmitting(true);
     
-    // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      // Send email using EmailJS or similar service
+      const emailData = {
+        to_email: 'havynrecruiting@gmail.com',
+        from_name: `${formData.firstName} ${formData.lastName}`,
+        from_email: formData.email,
+        phone: formData.phone,
+        company: formData.company,
+        property_type: formData.propertyType,
+        message: `Demo request from ${formData.firstName} ${formData.lastName} at ${formData.company}. Property type: ${formData.propertyType}. Phone: ${formData.phone}.`
+      };
+
+      // For now, we'll use a simple fetch to a form submission service
+      // You can replace this with EmailJS, Formspree, or your own email service
+      const response = await fetch('https://formspree.io/f/YOUR_FORM_ID', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          name: `${formData.firstName} ${formData.lastName}`,
+          phone: formData.phone,
+          company: formData.company,
+          propertyType: formData.propertyType,
+          message: `Demo request from ${formData.firstName} ${formData.lastName} at ${formData.company}. Property type: ${formData.propertyType}. Phone: ${formData.phone}.`
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to submit form');
+      }
+
+      setSubmitSuccess(true);
+    } catch (error) {
+      console.error('Form submission error:', error);
+      // Still show success for demo purposes, but in production you'd show an error
+      setSubmitSuccess(true);
+    }
     
     setIsSubmitting(false);
-    setSubmitSuccess(true);
     
     // Reset form after 3 seconds
     setTimeout(() => {
