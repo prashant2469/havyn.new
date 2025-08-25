@@ -168,6 +168,16 @@ const pollForResults = async (job_id: string, accountIdForJob: string | null) =>
     });
   };
 
+type SavedRun = {
+  job_id: string;
+  s3_key: string;
+  last_modified: string; // ISO string
+  size: number;          // bytes
+};
+
+const [savedRuns, setSavedRuns] = useState<SavedRun[]>([]);
+const [loadingSaved, setLoadingSaved] = useState(false);
+
 const loadSavedRun = async (jobId: string, accountId: string) => {
   const params = new URLSearchParams();
   params.set("job_id", jobId);
