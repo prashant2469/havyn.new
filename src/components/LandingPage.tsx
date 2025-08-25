@@ -407,9 +407,9 @@ export function LandingPage() {
       {/* Demo Booking Modal */}
       {showDemoForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-havyn-primary bg-opacity-10 dark:bg-opacity-20 rounded-lg flex items-center justify-center">
                   <Calendar className="w-4 h-4 text-havyn-primary dark:text-green-400" />
@@ -428,7 +428,7 @@ export function LandingPage() {
             </div>
 
             {/* Form Content */}
-            <div className="p-6">
+            <div className="p-6 flex-1 overflow-y-auto">
               {submitSuccess ? (
                 <div className="text-center py-8">
                   <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -442,7 +442,7 @@ export function LandingPage() {
                   </p>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -475,6 +475,9 @@ export function LandingPage() {
                       />
                     </div>
                   </div>
+                </div>
+              )}
+            </div>
 
                   <div>
                     <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -547,32 +550,34 @@ export function LandingPage() {
                     </select>
                   </div>
 
-                  <div className="pt-4">
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full bg-havyn-primary text-white py-3 px-4 rounded-lg font-medium hover:bg-havyn-dark focus:outline-none focus:ring-2 focus:ring-havyn-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          Submitting...
-                        </>
-                      ) : (
-                        <>
-                          <Calendar className="w-4 h-4" />
-                          Book Demo
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                    We'll contact you within 24 hours to schedule your personalized demo.
-                  </p>
+            {/* Fixed Footer with Submit Button */}
+            {!submitSuccess && (
+              <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
+                <form onSubmit={handleSubmit}>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full bg-havyn-primary text-white py-3 px-4 rounded-lg font-medium hover:bg-havyn-dark focus:outline-none focus:ring-2 focus:ring-havyn-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 mb-3"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <Calendar className="w-4 h-4" />
+                        Book Demo
+                      </>
+                    )}
+                  </button>
                 </form>
-              )}
-            </div>
+
+                <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                  We'll contact you within 24 hours to schedule your personalized demo.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
