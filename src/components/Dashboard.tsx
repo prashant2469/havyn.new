@@ -56,7 +56,14 @@ export function Dashboard() {
     changedRows: number;
     changes: Array<{
       tenant: string;
-  const pollForResults = async (job_id: string) => {
+      property: string;
+      unit: string;
+      changes: Record<string, { old: any; new: any }>;
+    }>;
+  } | null>(null);
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+ const pollForResults = async (job_id: string) => {
   const maxAttempts = 60;
   const intervalMs = 5000;
   const accountId = user?.id ?? null;
@@ -101,7 +108,124 @@ export function Dashboard() {
   }
 
   throw new Error('Polling timed out');
-};rue);
+};
+  //POLLING HELP
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isGenerating && generatingProgress < 95) {
+      interval = setInterval(() => {
+        setGeneratingProgress(prev => {
+          const increment = Math.random() * 15;
+          const newProgress = prev + increment;
+          return newProgress > 95 ? 95 : newProgress;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isGenerating, generatingProgress]);
+
+  useEffect(() => {
+    if (insights.length > 0) {
+      const properties = insights.map(insight => insight.property);
+      setExpandedProperties(new Set(properties));
+      setAllExpanded(true);
+    }
+  }, [insights]);
+
+  const handleFileSelect = (newFiles: { [key: string]: File }) => {
+    if (newFiles.combined) {
+      setFiles({ combined: newFiles.combined });
+    } else {
+      const { combined, ...existingFiles } = files;
+      setFiles({ ...existingFiles, ...newFiles });
+    }
+    setError(null);
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const base64String = reader.result as string;
+        const base64Content = base64String.split(',')[1];
+        resolve(base64Content);
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const fetchSavedInsights = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    setError(null);
+    setShowSavedInsights(true);
+    setShowUploadSection(false);
+    setMergedData([]);
+    setInsights([]);
+    setShowPreview(false);
+    setGeneratingProgress(0);
+    setRequestData(null);
+    setDebugData(null);
+    
+    try {
+      // First get the latest report
+      const { data: latestReport, error: reportError } = await supabase
+        .from('insight_reports')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('is_latest', true)
+        .single();
+
+      if (reportError) throw reportError;
+
+      if (!latestReport) {
+        setError('No previous insights found for your account');
+        return;
+      }
+
+      // Then get all insights from that report
+      const { data, error: insightsError } = await supabase
+        .from('tenant_insights')
+        .select('*')
+        .eq('report_id', latestReport.id)
+        .order('created_at', { ascending: false });
+
+      if (insightsError) throw insightsError;
+
+      if (!data || data.length === 0) {
+        setError('No previous insights found for your account');
+        return;
+      }
+
+      setInsights(data);
+    } catch (error) {
+      console.error('Error fetching saved insights:', error);
+      setError(error instanceof Error ? error.message : 'Error fetching saved insights');
+      setInsights([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const mergeFiles = async () => {
+    if (files.combined) {
+      if (!files.combined) {
+        setError('Please upload the combined report file');
+        return;
+      }
+    } else {
+      if (!files.delinquency || !files.rentRoll || !files.directory) {
+        setError('Please upload all three files or a combined report file');
+        return;
+      }
+    }
+  
+    setLoading(true);
     setError(null);
     setShowSavedInsights(false);
     setInsights([]);
