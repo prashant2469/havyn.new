@@ -596,7 +596,7 @@ if (!accountIdForJob && user?.id) {
 }
 
 console.log('Polling with job_id:', job_id, 'accountIdForJob:', accountIdForJob);
-const results = await pollForResults(job_id, accountIdForJob, s3_key);
+const results = await pollForResults(job_id, accountIdForJob);
       setGeneratingProgress(100);
   
       setTimeout(() => {
