@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { supabase } from '@/lib/supabase';
 
 // Marker icons for landlord properties vs comps
 const landlordIcon = new L.Icon({
@@ -57,14 +58,23 @@ function quantiles(nums: number[]) {
   return { p25: Math.round(q(0.25)), p50: Math.round(q(0.5)), p75: Math.round(q(0.75)) };
 }
 
-async function fetchComps(lat:number,lng:number, beds?:number, baths?:number, radiusMiles=3, limit=40) : Promise<Comp[]> {
-  const res = await fetch('/functions/v1/get-market-comps', {
-    method: 'POST', headers: { 'content-type':'application/json' },
-    body: JSON.stringify({ lat, lng, beds, baths, radiusMiles, limit })
+async function fetchComps(
+  lat: number,
+  lng: number,
+  beds?: number,
+  baths?: number,
+  radiusMiles = 3,
+  limit = 40
+): Promise<Comp[]> {
+  const { data, error } = await supabase.functions.invoke('get-market-comps', {
+    body: { lat, lng, beds, baths, radiusMiles, limit },
   });
-  if (!res.ok) throw new Error(await res.text());
-  const json = await res.json();
-  return json.comps as Comp[];
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data?.comps ?? []) as Comp[];
 }
 
 function FitToAll({ coords }:{ coords: Array<[number,number]> }){
