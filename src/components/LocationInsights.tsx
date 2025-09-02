@@ -65,7 +65,13 @@ async function fetchComps(
   baths?: number,
   radiusMiles = 3,
   limit = 40
-): Promise<Comp[]> {
+): Promise<Comp[]> 
+  // Check if a user is logged in
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData.session) {
+    throw new Error("Please log in to load comps.");
+  }
+
   const { data, error } = await supabase.functions.invoke('get-market-comp', {
     body: { lat, lng, beds, baths, radiusMiles, limit },
   });
