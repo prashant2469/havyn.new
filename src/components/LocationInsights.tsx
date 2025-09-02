@@ -66,7 +66,7 @@ async function fetchComps(
   radiusMiles = 3,
   limit = 40
 ): Promise<Comp[]> {
-  const { data, error } = await supabase.functions.invoke('get-market-comps', {
+  const { data, error } = await supabase.functions.invoke('get-market-comp', {
     body: { lat, lng, beds, baths, radiusMiles, limit },
   });
 
