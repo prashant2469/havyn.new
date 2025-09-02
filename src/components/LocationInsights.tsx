@@ -298,6 +298,7 @@ export default function LocationInsights({ insights, propertyLatLng }:{ insights
   );
 }
 
+export { LocationInsights };
 
 /*
 import React, { useMemo } from 'react';
