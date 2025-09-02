@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { supabase } from '@/lib/supabase';
+import { supabase } from "../lib/supabase";
 
 // Marker icons for landlord properties vs comps
 const landlordIcon = new L.Icon({
