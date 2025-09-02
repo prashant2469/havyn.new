@@ -76,9 +76,7 @@ async function fetchComps(
     body: { lat, lng, beds, baths, radiusMiles, limit },
   });
 
-  if (error) {
-    throw new Error(error.message);
-  }
+  if (error) throw new Error(error.message);
 
   return (data?.comps ?? []) as Comp[];
 }
