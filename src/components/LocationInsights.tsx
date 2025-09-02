@@ -357,7 +357,7 @@ export function LocationInsights({ insights }) {
   
   return (
     <div className="space-y-8">
-      {/* Property cards */}
+      {/* Property cards }
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {locationSummaries.map(loc => (
           <div
@@ -393,7 +393,7 @@ export function LocationInsights({ insights }) {
           </div>
         ))}
       </div>
-      {/* Interactive map */}
+      {/* Interactive map }
       {locationSummaries.some(l => l.lat && l.lng) && (
         <div className="h-96 w-full rounded-lg overflow-hidden shadow">
           <MapContainer center={mapCenter} zoom={mapZoom} style={{ height: '100%', width: '100%' }}>
