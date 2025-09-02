@@ -63,7 +63,17 @@ export function Dashboard() {
     }>;
   } | null>(null);
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  
+
+  const propertyLatLng = {
+  "The Villas at Park Terrace - 301 Walkertown Ave Winston Salem, NC 27105": {
+    latitude: 36.1170555787963,
+    longitude: -80.20638809515557,
+  },
+  "High Meadow Apartments - 5625 Farm Pond Ln, Charlotte, NC 28212": {
+    latitude: 35.1827,
+    longitude: -80.7414,
+  };
+    
 const API_BASE = "https://zv54onyhgk.execute-api.us-west-1.amazonaws.com/prod";
   
 const pollForResults = async (job_id: string, accountIdForJob: string | null) => {
@@ -1499,7 +1509,10 @@ const results = await pollForResults(job_id, accountIdForJob);
             )}
           
             {activeTab === 'location' && (
-              <LocationInsights insights={insights} />
+              <LocationInsights 
+                insights={insights} 
+                propertyLatLng={propertyLatLng}
+                />
             )}
           
             {activeTab === 'delinquency' && (
