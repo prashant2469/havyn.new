@@ -75,6 +75,20 @@ const propertyLatLng = {
   },
 };
 
+const propertyMeta: Record<string, { city: string; state: string; postalCode?: string }> = {
+  "The Villas at Park Terrace - 301 Walkertown Ave Winston Salem, NC 27105": {
+    city: "Winston-Salem",
+    state: "NC",
+    postalCode: "27105",
+  },
+  "High Meadow Apartments - 5625 Farm Pond Ln, Charlotte, NC 28212": {
+    city: "Charlotte",
+    state: "NC",
+    postalCode: "28212",
+  },
+  // add more properties here as you go…
+};
+
 const API_BASE = "https://zv54onyhgk.execute-api.us-west-1.amazonaws.com/prod";
   
 const pollForResults = async (job_id: string, accountIdForJob: string | null) => {
@@ -1512,6 +1526,7 @@ const results = await pollForResults(job_id, accountIdForJob);
               <LocationInsights 
                 insights={insights} 
                 propertyLatLng={propertyLatLng}
+                propertyMeta={propertyMeta}
                 />
             )}
           
