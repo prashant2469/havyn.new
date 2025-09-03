@@ -66,7 +66,7 @@ export function Dashboard() {
 
 const propertyLatLng = {
   "The Villas at Park Terrace - 301 Walkertown Ave Winston Salem, NC 27105": {
-    latitude: 36.1170555787963,
+    latitude: 36.1170555787963, 
     longitude: -80.20638809515557,
   },
   "High Meadow Apartments - 5625 Farm Pond Ln, Charlotte, NC 28212": {
