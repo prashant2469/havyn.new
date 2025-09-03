@@ -17,6 +17,10 @@ const compIcon = new L.DivIcon({
   iconSize: [22, 22], iconAnchor: [11, 11]
 });
 
+// make a cache key that includes filters
+const makeCompKey = (property: string) =>
+  `${property}|b${bedsFilter ?? ''}|ba${bathsFilter ?? ''}|r${radiusMi}`;
+
 export type Insight = {
   property: string;
   tenant_score?: number;
@@ -145,7 +149,8 @@ export default function LocationInsights({ insights, propertyLatLng, propertyMet
         meta?.postalCode
       );
   
-      setCompMap((m) => ({ ...m, [property]: comps }));
+    const key = makeCompKey(property);
+    setCompMap((m) => ({ ...m, [key]: comps }));
     } catch (e: any) {
       const msg = String(e?.message || "Failed to load comps");
       setErrorMap((m) => ({
@@ -161,7 +166,8 @@ export default function LocationInsights({ insights, propertyLatLng, propertyMet
 
   const enriched = useMemo(()=>{
     return summaries.map((s)=>{
-      const comps = compMap[s.property] || [];
+      const compKey = makeCompKey(s.property);
+      const comps = compMap[compKey] || [];
       const rents = comps.map(c=>c.rent).filter((n)=>Number.isFinite(n) && n>0);
       const q = quantiles(rents);
       const compCount = rents.length;
@@ -235,6 +241,15 @@ export default function LocationInsights({ insights, propertyLatLng, propertyMet
                 </div>
               </div>
 
+              {loc.compCount != null && (
+                <div className="text-xs text-gray-500 text-center mt-1">
+                  {loc.compCount} comps
+                  {bedsFilter ? ` • ${bedsFilter}bd` : ''}
+                  {bathsFilter ? `/${bathsFilter}ba` : ''}
+                  {` • radius ${radiusMi}mi`}
+                </div>
+              )}
+              
               <div className="flex items-center justify-between text-sm">
                 <div className="text-gray-600">Suggested Band:</div>
                 <div className="font-semibold">{loc.compCount? `${usd(loc.suggestedLow||0)} - ${usd(loc.suggestedHigh||0)}` : '—'}</div>
