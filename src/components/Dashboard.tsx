@@ -80,11 +80,15 @@ const propertyMeta: Record<string, { city: string; state: string; postalCode?: s
     city: "Winston-Salem",
     state: "NC",
     postalCode: "27105",
+    defaultBeds: 2,
+    defaultBaths: 1,
   },
   "High Meadow Apartments - 5625 Farm Pond Ln, Charlotte, NC 28212": {
     city: "Charlotte",
     state: "NC",
     postalCode: "28212",
+    defaultBeds: 2,
+    defaultBaths: 2,
   },
   // add more properties here as you go…
 };
