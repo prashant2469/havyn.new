@@ -17,10 +17,6 @@ const compIcon = new L.DivIcon({
   iconSize: [22, 22], iconAnchor: [11, 11]
 });
 
-// make a cache key that includes filters
-const makeCompKey = (property: string) =>
-  `${property}|b${bedsFilter ?? ''}|ba${bathsFilter ?? ''}|r${radiusMi}`;
-
 export type Insight = {
   property: string;
   tenant_score?: number;
@@ -109,6 +105,10 @@ export default function LocationInsights({ insights, propertyLatLng, propertyMet
   const [bathsFilter, setBathsFilter] = useState<number|undefined>(undefined);
   const [loadingKey, setLoadingKey] = useState<string|null>(null);
 
+  // make a cache key that includes filters
+  const makeCompKey = (property: string) =>
+    `${property}|b${bedsFilter ?? ''}|ba${bathsFilter ?? ''}|r${radiusMi}`;
+  
   const summaries: LocationSummary[] = useMemo(()=>{
     const groups: Record<string, Insight[]> = {};
     for (const t of insights||[]) {
