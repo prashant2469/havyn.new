@@ -108,6 +108,12 @@ export default function LocationInsights({ insights, propertyLatLng, propertyMet
   // make a cache key that includes filters
   const makeCompKey = (property: string) =>
     `${property}|b${bedsFilter ?? ''}|ba${bathsFilter ?? ''}|r${radiusMi}`;
+
+  useEffect(() => {
+    // Clear caches so next “Load Comps” fetch uses the new filters
+    setCompMap({});
+    setErrorMap({});
+  }, [bedsFilter, bathsFilter, radiusMi]);
   
   const summaries: LocationSummary[] = useMemo(()=>{
     const groups: Record<string, Insight[]> = {};
