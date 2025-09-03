@@ -138,15 +138,34 @@ export default function LocationInsights({ insights, propertyLatLng, propertyMet
   const [compMap, setCompMap] = useState<Record<string, Comp[]>>({});
   const [errorMap, setErrorMap] = useState<Record<string,string>>({});
 
-  async function loadCompsFor(property:string, lat:number, lng:number){
-    try{
+  async function loadCompsFor(property: string, lat: number, lng: number) {
+    try {
       setLoadingKey(property);
-      setErrorMap((m)=>({ ...m, [property]: '' }));
-      const comps = await fetchComps(lat, lng, bedsFilter, bathsFilter, radiusMi, 50);
-      setCompMap((m)=>({ ...m, [property]: comps }));
-    }catch(e:any){
-      setErrorMap((m)=>({ ...m, [property]: e?.message || 'Failed to load comps' }));
-    }finally{
+      setErrorMap((m) => ({ ...m, [property]: "" }));
+  
+      const meta = propertyMeta[property]; // <- NEW
+      const comps = await fetchComps(
+        lat,
+        lng,
+        bedsFilter,
+        bathsFilter,
+        radiusMi,
+        50,
+        meta?.city,
+        meta?.state,
+        meta?.postalCode
+      );
+  
+      setCompMap((m) => ({ ...m, [property]: comps }));
+    } catch (e: any) {
+      const msg = String(e?.message || "Failed to load comps");
+      setErrorMap((m) => ({
+        ...m,
+        [property]: msg.includes("No comps found")
+          ? "No comps found nearby. Try increasing the radius."
+          : msg,
+      }));
+    } finally {
       setLoadingKey(null);
     }
   }
