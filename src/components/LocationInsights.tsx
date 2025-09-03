@@ -17,17 +17,6 @@ const compIcon = new L.DivIcon({
   iconSize: [22, 22], iconAnchor: [11, 11]
 });
 
-const propertyLatLng = {
-  "The Villas at Park Terrace - 301 Walkertown Ave Winston Salem, NC 27105": {
-    latitude: 36.1170555787963, 
-    longitude: -80.20638809515557,
-  },
-  "High Meadow Apartments - 5625 Farm Pond Ln, Charlotte, NC 28212": {
-    latitude: 35.1827,
-    longitude: -80.7414,
-  },
-};
-
 export type Insight = {
   property: string;
   tenant_score?: number;
@@ -147,8 +136,8 @@ export default function LocationInsights({ insights, propertyLatLng, propertyMet
       const comps = await fetchComps(
         lat,
         lng,
-        bedsFilter,
-        bathsFilter,
+        bedsFilter ?? meta?.defaultBeds,
+        bathsFilter ?? meta?.defaultBaths,
         radiusMi,
         50,
         meta?.city,
