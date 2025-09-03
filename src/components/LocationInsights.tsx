@@ -103,7 +103,7 @@ function FitToAll({ coords }:{ coords: Array<[number,number]> }){
   return null;
 }
 
-export default function LocationInsights({ insights, propertyLatLng }:{ insights: Insight[]; propertyLatLng: Record<string,{latitude:number;longitude:number}> }){
+export default function LocationInsights({ insights, propertyLatLng, propertyMeta }:{ insights: Insight[]; propertyLatLng: Record<string,{latitude:number;longitude:number}>; propertyMeta?: PropertyMetaMap}){
   const [radiusMi, setRadiusMi] = useState(3);
   const [bedsFilter, setBedsFilter] = useState<number|undefined>(undefined);
   const [bathsFilter, setBathsFilter] = useState<number|undefined>(undefined);
