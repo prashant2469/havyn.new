@@ -99,7 +99,7 @@ function FitToAll({ coords }:{ coords: Array<[number,number]> }){
   return null;
 }
 
-export default function LocationInsights({ insights, propertyLatLng, propertyMeta }:{ insights: Insight[]; propertyLatLng: Record<string,{latitude:number;longitude:number}>; propertyMeta?: PropertyMetaMap}){
+export default function LocationInsights({ insights, propertyLatLng, propertyMeta = {}}:{ insights: Insight[]; propertyLatLng: Record<string,{latitude:number;longitude:number}>; propertyMeta?: PropertyMetaMap}){
   const [radiusMi, setRadiusMi] = useState(3);
   const [bedsFilter, setBedsFilter] = useState<number|undefined>(undefined);
   const [bathsFilter, setBathsFilter] = useState<number|undefined>(undefined);
@@ -109,6 +109,18 @@ export default function LocationInsights({ insights, propertyLatLng, propertyMet
   const makeCompKey = (property: string) =>
     `${property}|b${bedsFilter ?? ''}|ba${bathsFilter ?? ''}|r${radiusMi}`;
 
+  // Remove all cached entries for a given property (any filters)
+  function purgePropertyComps(property: string) {
+    setCompMap((prev) => {
+      const next: Record<string, Comp[]> = {};
+      const prefix = `${property}|`;
+      for (const [k, v] of Object.entries(prev)) {
+        if (!k.startsWith(prefix)) next[k] = v; // keep other properties' caches
+      }
+      return next;
+    });
+  }
+  
   useEffect(() => {
     // Clear caches so next “Load Comps” fetch uses the new filters
     setCompMap({});
@@ -140,9 +152,12 @@ export default function LocationInsights({ insights, propertyLatLng, propertyMet
   async function loadCompsFor(property: string, lat: number, lng: number) {
     try {
       setLoadingKey(property);
-      setErrorMap((m) => ({ ...m, [property]: "" }));
+      setErrorMap((m) => ({ ...m, [property]: '' }));
   
-      const meta = propertyMeta[property]; // <- NEW
+      // Purge any stale caches for this property (different filters)
+      purgePropertyComps(property);
+  
+      const meta = propertyMeta[property];
       const comps = await fetchComps(
         lat,
         lng,
@@ -155,14 +170,14 @@ export default function LocationInsights({ insights, propertyLatLng, propertyMet
         meta?.postalCode
       );
   
-    const key = makeCompKey(property);
-    setCompMap((m) => ({ ...m, [key]: comps }));
+      const key = makeCompKey(property);
+      setCompMap((m) => ({ ...m, [key]: comps }));
     } catch (e: any) {
-      const msg = String(e?.message || "Failed to load comps");
+      const msg = String(e?.message || 'Failed to load comps');
       setErrorMap((m) => ({
         ...m,
-        [property]: msg.includes("No comps found")
-          ? "No comps found nearby. Try increasing the radius."
+        [property]: msg.includes('No comps found')
+          ? 'No comps found nearby. Try increasing the radius.'
           : msg,
       }));
     } finally {
