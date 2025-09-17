@@ -131,7 +131,7 @@ const connectGmail = async () => {
     if (!session) throw new Error("You must be signed in to connect Gmail.");
 
     const { data, error } = await supabase.functions.invoke("oauth-google-start", {
-      body: { uid: user.id },
+      body: { code, uid: user.id },
     });
 
     if (error) {
