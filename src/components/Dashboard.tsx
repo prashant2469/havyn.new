@@ -124,29 +124,34 @@ const connectGmail = async () => {
     setError("Please log in first.");
     return;
   }
-  try {
-    setGmailConnecting(true);
 
-    // pass the current user id so the callback can bind the secret to this landlord
-// make sure this runs in a signed-in context
+  setGmailConnecting(true);
+  try {
+    // Optional sanity check: ensure a Supabase session exists (so invoke adds Authorization)
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("You must be signed in to connect Gmail.");
+
+    // Call the Edge Function (must return { url } or { authUrl })
     const { data, error } = await supabase.functions.invoke("oauth-google-start", {
-      body: { uid: user.id }, // optional; you can also read uid from the JWT on the server
+      body: { uid: user.id }, // or omit and encode uid in a signed `state` on server
     });
     if (error) throw error;
-    window.location.href = data.url; // redirect to Google's OAuth screen
 
-    if (!r.ok) {
-      const t = await r.text();
-      throw new Error(`Failed to start Google OAuth: ${t}`);
+    const redirect = data?.url ?? data?.authUrl;
+    if (!redirect) throw new Error("No auth URL returned from oauth-google-start.");
+
+    // Optional: store an email hint if your function returns it
+    if (data?.emailHint) localStorage.setItem("gmailConnectedEmail", data.emailHint);
+
+    // Top-level navigation (handles iframe/webcontainer)
+    if (window.top) {
+      (window.top as Window).location.href = redirect;
+    } else {
+      window.location.href = redirect;
     }
-    const { authUrl, emailHint } = await r.json(); // emailHint optional if you add it later
-    if (emailHint) localStorage.setItem("gmailConnectedEmail", emailHint);
-
-    // Go to Google consent screen
-    window.location.href = authUrl;
   } catch (e: any) {
     console.error(e);
-    setError(e.message || "Failed to start Gmail connect");
+    setError(e?.message || "Failed to start Gmail connect");
   } finally {
     setGmailConnecting(false);
   }
