@@ -94,6 +94,75 @@ const propertyMeta: Record<string, { city: string; state: string; postalCode?: s
 };
 
 const API_BASE = "https://zv54onyhgk.execute-api.us-west-1.amazonaws.com/prod";
+
+// ------- GMAIL OAUTH INTEGRATION SECTION -------
+const FUNCTIONS_BASE = `${supabase.supabaseUrl}/functions/v1`;
+const POLLER_URL = import.meta.env.VITE_POLLER_URL; // set to your Lambda Function URL
+
+
+const [gmailConnecting, setGmailConnecting] = useState(false);
+const [gmailConnected, setGmailConnected] = useState<boolean>(false);
+const [gmailEmail, setGmailEmail] = useState<string | null>(null);
+
+// on page load, detect the callback redirect (?gmail=connected) and show status
+useEffect(() => {
+  const qs = new URLSearchParams(window.location.search);
+  if (qs.get("gmail") === "connected") {
+    setGmailConnected(true);
+    // optional: read an email you stashed in localStorage or fetch from your own status endpoint
+    const lastEmail = localStorage.getItem("gmailConnectedEmail");
+    if (lastEmail) setGmailEmail(lastEmail);
+    // clean the URL
+    qs.delete("gmail");
+    const url = `${window.location.pathname}${qs.toString() ? "?" + qs.toString() : ""}`;
+    window.history.replaceState({}, "", url);
+  }
+}, []);
+
+const connectGmail = async () => {
+  if (!user?.id) {
+    setError("Please log in first.");
+    return;
+  }
+  try {
+    setGmailConnecting(true);
+
+    // pass the current user id so the callback can bind the secret to this landlord
+    const r = await fetch(`${FUNCTIONS_BASE}/oauth-google-start?uid=${encodeURIComponent(user.id)}`, {
+      method: "GET",
+      headers: { "Accept": "application/json" }
+    });
+
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error(`Failed to start Google OAuth: ${t}`);
+    }
+    const { authUrl, emailHint } = await r.json(); // emailHint optional if you add it later
+    if (emailHint) localStorage.setItem("gmailConnectedEmail", emailHint);
+
+    // Go to Google consent screen
+    window.location.href = authUrl;
+  } catch (e: any) {
+    console.error(e);
+    setError(e.message || "Failed to start Gmail connect");
+  } finally {
+    setGmailConnecting(false);
+  }
+};
+
+const syncNow = async () => {
+  if (!user?.id) { setError("Please log in first."); return; }
+  try {
+    await fetch(POLLER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id })
+    });
+  } catch (e:any) {
+    setError(e.message || "Failed to trigger sync");
+  }
+};
+// ------- GMAIL OAUTH INTEGRATION SECTION -------
   
 const pollForResults = async (job_id: string, accountIdForJob: string | null) => {
   const maxAttempts = 60;
@@ -947,6 +1016,27 @@ const results = await pollForResults(job_id, accountIdForJob);
           <History className="w-5 h-5" />
           <span>View Saved Insights</span>
         </button>
+        <button
+          onClick={connectGmail}
+          disabled={gmailConnecting || !user}
+          className="px-4 py-2 bg-[#3F6B28] text-white rounded-lg hover:bg-[#345A22] disabled:opacity-50 flex items-center gap-2"
+        >
+          {gmailConnecting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Users className="w-5 h-5" />}
+          <span>
+            {gmailConnected ? (gmailEmail ? `Gmail Connected (${gmailEmail})` : "Gmail Connected") : "Connect Gmail"}
+          </span>
+        </button>
+      
+        {/* NEW (optional): manual sync trigger for the poller */}
+        {gmailConnected && (
+          <button
+            onClick={syncNow}
+            className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 flex items-center gap-2"
+          >
+            <Clock className="w-5 h-5" />
+            <span>Sync Now</span>
+          </button>
+        )}
         {import.meta.env.DEV && (
           <button
             onClick={toggleDebugPanel}
