@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { useAuth } from "../contexts/AuthContext";
 
 const POST_CONNECT_REDIRECT = "/?gmail=connected"; // change to "/settings?gmail=connected" if you prefer
 
@@ -24,7 +25,7 @@ export default function GoogleGmailCallback() {
 
       // Exchange code server-side (adds Authorization header automatically)
       const { data, error } = await supabase.functions.invoke("oauth-google-callback", {
-        body: { code, state },
+        body: { code, state, userId: user.id },
       });
 
       if (error || !data?.ok) {
