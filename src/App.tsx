@@ -8,7 +8,7 @@ import { AuthForm } from './components/AuthForm';
 import { LandingPage } from './components/LandingPage';
 import { TenantApp } from './components/TenantApp';
 import { useAuth } from './contexts/AuthContext';
-import GoogleGmailCallback from './components/GoogleGmailCallback';
+import GoogleGmailCallback from './components/GmailCallback';
 
 function AppContent() {
   const { user, loading } = useAuth();
