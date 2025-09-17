@@ -58,7 +58,7 @@ function App() {
             path="/oauth/google/callback"
             element={
               <AuthProvider>
-                <GoogleGmailCallback />
+                <GmailCallback />
               </AuthProvider>
             }
           />
