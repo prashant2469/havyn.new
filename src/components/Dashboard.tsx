@@ -155,7 +155,8 @@ const connectGmail = async () => {
   } finally {
     setGmailConnecting(false);
   }
-
+};
+  
 const syncNow = async () => {
   if (!user?.id) { setError("Please log in first."); return; }
   try {
