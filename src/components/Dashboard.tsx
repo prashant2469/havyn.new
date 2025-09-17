@@ -174,6 +174,31 @@ const syncNow = async () => {
     setError(e.message || "Failed to trigger sync");
   }
 };
+
+useEffect(() => {
+  (async () => {
+    if (!user?.id) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke("gmail-status", {
+        body: { userId: user.id }
+      });
+      if (error) {
+        console.error("gmail-status error:", error);
+        return;
+      }
+      if (data?.connected) {
+        setGmailConnected(true);
+        if (data?.email) setGmailEmail(data.email);
+      } else {
+        setGmailConnected(false);
+        setGmailEmail(null);
+      }
+    } catch (e) {
+      console.error("gmail-status failed:", e);
+    }
+  })();
+}, [user?.id]);
 // ------- GMAIL OAUTH INTEGRATION SECTION -------
   
 const pollForResults = async (job_id: string, accountIdForJob: string | null) => {
