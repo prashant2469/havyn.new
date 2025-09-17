@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 const POST_CONNECT_REDIRECT = "/?gmail=connected"; // change to "/settings?gmail=connected" if you prefer
 
 export default function GoogleGmailCallback() {
+  const { user } = useAuth();
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
