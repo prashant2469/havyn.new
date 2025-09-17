@@ -126,28 +126,33 @@ const connectGmail = async () => {
   }
 
   setGmailConnecting(true);
-  
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error("You must be signed in to connect Gmail.");
-  
+
     const { data, error } = await supabase.functions.invoke("oauth-google-start", {
       body: { uid: user.id },
     });
-  
+
     if (error) {
-      // `error` has message + status if server returned 4xx/5xx
-      console.error("oauth-google-start error:", error);
-      throw new Error(error.message || "Edge function failed");
+      // Try to read the response body from the error (supabase-js exposes .context)
+      // @ts-ignore
+      const ctxText = typeof error.context?.text === "function" ? await error.context.text() : "";
+      console.error("oauth-google-start error:", error, ctxText);
+      throw new Error(error.message || ctxText || "Edge function failed");
     }
-  
-    // Some older code used { authUrl }; support both
-    const redirect = (data as any)?.url ?? (data as any)?.authUrl;
-    if (!redirect) {
-      console.error("oauth-google-start data:", data);
-      throw new Error("No auth URL returned from oauth-google-start");
+
+    if (!data?.ok) {
+      // The function returned 200 with an error payload
+      const msg = data?.error || "oauth-google-start returned ok:false";
+      console.error("oauth-google-start payload:", data);
+      setError(msg);
+      return;
     }
-  
+
+    const redirect = data?.url ?? data?.authUrl;
+    if (!redirect) throw new Error("No auth URL returned from oauth-google-start");
+
     (window.top ?? window).location.href = redirect;
   } catch (e: any) {
     console.error(e);
