@@ -128,10 +128,12 @@ const connectGmail = async () => {
     setGmailConnecting(true);
 
     // pass the current user id so the callback can bind the secret to this landlord
-    const r = await fetch(`${FUNCTIONS_BASE}/oauth-google-start?uid=${encodeURIComponent(user.id)}`, {
-      method: "GET",
-      headers: { "Accept": "application/json" }
+// make sure this runs in a signed-in context
+    const { data, error } = await supabase.functions.invoke("oauth-google-start", {
+      body: { uid: user.id }, // optional; you can also read uid from the JWT on the server
     });
+    if (error) throw error;
+    window.location.href = data.url; // redirect to Google's OAuth screen
 
     if (!r.ok) {
       const t = await r.text();
