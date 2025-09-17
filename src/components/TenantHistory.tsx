@@ -1,4 +1,4 @@
-import React from 'react';
+import React from 'react'; 
 import { TenantInsight } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 import { TrendingUp, TrendingDown, ArrowRight, AlertTriangle, Clock } from 'lucide-react';
