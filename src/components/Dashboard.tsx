@@ -183,13 +183,15 @@ useEffect(() => {
       const { data, error } = await supabase.functions.invoke("gmail-status", {
         body: { userId: user.id }
       });
+
       if (error) {
         console.error("gmail-status error:", error);
         return;
       }
+
       if (data?.connected) {
         setGmailConnected(true);
-        if (data?.email) setGmailEmail(data.email);
+        setGmailEmail(data.email);
       } else {
         setGmailConnected(false);
         setGmailEmail(null);
