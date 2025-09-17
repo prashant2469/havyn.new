@@ -53,6 +53,14 @@ function App() {
               </TenantAuthProvider>
             } 
           />
+          <Route
+            path="/oauth/google/callback"
+            element={
+              <AuthProvider>
+                <GoogleGmailCallback />
+              </AuthProvider>
+            }
+          />
         </Routes>
       </ThemeProvider>
     </Router>
