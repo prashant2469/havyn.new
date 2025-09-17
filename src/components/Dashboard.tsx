@@ -126,35 +126,35 @@ const connectGmail = async () => {
   }
 
   setGmailConnecting(true);
-setGmailConnecting(true);
-try {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error("You must be signed in to connect Gmail.");
-
-  const { data, error } = await supabase.functions.invoke("oauth-google-start", {
-    body: { uid: user.id },
-  });
-
-  if (error) {
-    // `error` has message + status if server returned 4xx/5xx
-    console.error("oauth-google-start error:", error);
-    throw new Error(error.message || "Edge function failed");
+  
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("You must be signed in to connect Gmail.");
+  
+    const { data, error } = await supabase.functions.invoke("oauth-google-start", {
+      body: { uid: user.id },
+    });
+  
+    if (error) {
+      // `error` has message + status if server returned 4xx/5xx
+      console.error("oauth-google-start error:", error);
+      throw new Error(error.message || "Edge function failed");
+    }
+  
+    // Some older code used { authUrl }; support both
+    const redirect = (data as any)?.url ?? (data as any)?.authUrl;
+    if (!redirect) {
+      console.error("oauth-google-start data:", data);
+      throw new Error("No auth URL returned from oauth-google-start");
+    }
+  
+    (window.top ?? window).location.href = redirect;
+  } catch (e: any) {
+    console.error(e);
+    setError(e?.message || "Failed to start Gmail connect");
+  } finally {
+    setGmailConnecting(false);
   }
-
-  // Some older code used { authUrl }; support both
-  const redirect = (data as any)?.url ?? (data as any)?.authUrl;
-  if (!redirect) {
-    console.error("oauth-google-start data:", data);
-    throw new Error("No auth URL returned from oauth-google-start");
-  }
-
-  (window.top ?? window).location.href = redirect;
-} catch (e: any) {
-  console.error(e);
-  setError(e?.message || "Failed to start Gmail connect");
-} finally {
-  setGmailConnecting(false);
-}
 
 const syncNow = async () => {
   if (!user?.id) { setError("Please log in first."); return; }
