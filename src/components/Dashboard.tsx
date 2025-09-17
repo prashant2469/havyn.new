@@ -126,36 +126,35 @@ const connectGmail = async () => {
   }
 
   setGmailConnecting(true);
-  try {
-    // Optional sanity check: ensure a Supabase session exists (so invoke adds Authorization)
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error("You must be signed in to connect Gmail.");
+setGmailConnecting(true);
+try {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("You must be signed in to connect Gmail.");
 
-    // Call the Edge Function (must return { url } or { authUrl })
-    const { data, error } = await supabase.functions.invoke("oauth-google-start", {
-      body: { uid: user.id }, // or omit and encode uid in a signed `state` on server
-    });
-    if (error) throw error;
+  const { data, error } = await supabase.functions.invoke("oauth-google-start", {
+    body: { uid: user.id },
+  });
 
-    const redirect = data?.url ?? data?.authUrl;
-    if (!redirect) throw new Error("No auth URL returned from oauth-google-start.");
-
-    // Optional: store an email hint if your function returns it
-    if (data?.emailHint) localStorage.setItem("gmailConnectedEmail", data.emailHint);
-
-    // Top-level navigation (handles iframe/webcontainer)
-    if (window.top) {
-      (window.top as Window).location.href = redirect;
-    } else {
-      window.location.href = redirect;
-    }
-  } catch (e: any) {
-    console.error(e);
-    setError(e?.message || "Failed to start Gmail connect");
-  } finally {
-    setGmailConnecting(false);
+  if (error) {
+    // `error` has message + status if server returned 4xx/5xx
+    console.error("oauth-google-start error:", error);
+    throw new Error(error.message || "Edge function failed");
   }
-};
+
+  // Some older code used { authUrl }; support both
+  const redirect = (data as any)?.url ?? (data as any)?.authUrl;
+  if (!redirect) {
+    console.error("oauth-google-start data:", data);
+    throw new Error("No auth URL returned from oauth-google-start");
+  }
+
+  (window.top ?? window).location.href = redirect;
+} catch (e: any) {
+  console.error(e);
+  setError(e?.message || "Failed to start Gmail connect");
+} finally {
+  setGmailConnecting(false);
+}
 
 const syncNow = async () => {
   if (!user?.id) { setError("Please log in first."); return; }
