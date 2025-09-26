@@ -95,6 +95,13 @@ const propertyMeta: Record<string, { city: string; state: string; postalCode?: s
 
 const API_BASE = "https://zv54onyhgk.execute-api.us-west-1.amazonaws.com/prod";
 
+const [jobSummary, setJobSummary] = useState<{
+  total: number;
+  new: number;
+  changed: number;
+  unchanged: number;
+} | null>(null);
+
 // ------- GMAIL OAUTH INTEGRATION SECTION -------
 const FUNCTIONS_BASE = `${supabase.supabaseUrl}/functions/v1`;
 const POLLER_URL = import.meta.env.VITE_POLLER_URL; // set to your Lambda Function URL
@@ -198,6 +205,41 @@ useEffect(() => {
       }
     } catch (e) {
       console.error("gmail-status failed:", e);
+    }
+  })();
+}, [user?.id]);
+
+// ✅ NEW: Fetch latest Analyzer results for this landlord
+useEffect(() => {
+  if (!user?.id) return;
+
+  (async () => {
+    try {
+      const params = new URLSearchParams();
+      params.set("account_id", user.id);
+      params.set("action", "latest"); // ask backend for latest job results
+
+      const url = `${API_BASE}/get_results?${params.toString()}`;
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
+      const text = await res.text();
+
+      let payload: any;
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        console.error("❌ Failed to parse get_results payload", text);
+        return;
+      }
+
+      if (res.status === 200 && payload?.results) {
+        setInsights(payload.results.map((i: any) => ({
+          ...i,
+          score: typeof i.tenant_score === "number" ? i.tenant_score : 0,
+        })));
+        setJobSummary(payload.summary);
+      }
+    } catch (err) {
+      console.error("❌ Failed to fetch latest insights:", err);
     }
   })();
 }, [user?.id]);
@@ -1452,7 +1494,31 @@ const results = await pollForResults(job_id, accountIdForJob);
           </div>
         </div>
       )}
-
+      {jobSummary && (
+        <div className="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-[#3F6B28] dark:text-green-400 mb-4">
+            Latest Sync Summary
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <p className="text-2xl font-bold">{jobSummary.total}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Total Tenants</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-green-600">{jobSummary.new}</p>
+              <p className="text-sm">New</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-blue-600">{jobSummary.changed}</p>
+              <p className="text-sm">Changed</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-600">{jobSummary.unchanged}</p>
+              <p className="text-sm">Unchanged</p>
+            </div>
+          </div>
+        </div>
+      )}
       {stats && !showSavedRunsList && (
         <div className="space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
