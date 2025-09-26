@@ -102,6 +102,9 @@ const [jobSummary, setJobSummary] = useState<{
   unchanged: number;
 } | null>(null);
 
+const [syncing, setSyncing] = useState(false);
+const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
 // ------- GMAIL OAUTH INTEGRATION SECTION -------
 const FUNCTIONS_BASE = `${supabase.supabaseUrl}/functions/v1`;
 const POLLER_URL = import.meta.env.VITE_POLLER_URL; // set to your Lambda Function URL
@@ -171,14 +174,25 @@ const connectGmail = async () => {
   
 const syncNow = async () => {
   if (!user?.id) { setError("Please log in first."); return; }
+  setSyncing(true);
+  setSyncMessage("Starting Gmail sync...");
+
   try {
-    await fetch(POLLER_URL, {
+    const res = await fetch(POLLER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: user.id })
     });
+
+    if (!res.ok) throw new Error("Poller returned error");
+    setSyncMessage("Gmail sync triggered — checking for new CSVs...");
+    
+    // Optional: kick off results polling right away
+    // e.g. call pollForResults() with a temporary job_id
   } catch (e:any) {
     setError(e.message || "Failed to trigger sync");
+  } finally {
+    setTimeout(() => setSyncing(false), 3000); // auto-hide after a few sec
   }
 };
 
@@ -1108,15 +1122,27 @@ const results = await pollForResults(job_id, accountIdForJob);
           </span>
         </button>
       
-        {/* NEW (optional): manual sync trigger for the poller */}
+        {/* NEW: manual sync trigger for the poller with feedback */}
         {gmailConnected && (
-          <button
-            onClick={syncNow}
-            className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 flex items-center gap-2"
-          >
-            <Clock className="w-5 h-5" />
-            <span>Sync Now</span>
-          </button>
+          <div className="flex flex-col gap-1">
+            <button
+              onClick={syncNow}
+              disabled={syncing}
+              className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+                syncing
+                  ? "bg-gray-500 cursor-not-allowed"
+                  : "bg-gray-800 hover:bg-gray-700 text-white"
+              }`}
+            >
+              <Clock className="w-5 h-5" />
+              <span>{syncing ? "Syncing..." : "Sync Now"}</span>
+            </button>
+            {syncMessage && (
+              <div className="text-sm text-blue-600 dark:text-blue-400 ml-1">
+                {syncMessage}
+              </div>
+            )}
+          </div>
         )}
         {import.meta.env.DEV && (
           <button
