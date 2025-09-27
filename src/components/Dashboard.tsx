@@ -173,39 +173,55 @@ const connectGmail = async () => {
 };
   
 const syncNow = async () => {
-  if (!user?.id) { setError("Please log in first."); return; }
+  if (!user?.id) {
+    setError("Please log in first.");
+    return;
+  }
+
   setSyncing(true);
   setSyncMessage("Starting Gmail sync...");
 
   try {
-    // 1. Trigger Gmail poller
     const res = await fetch(POLLER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id })
+      body: JSON.stringify({ userId: user.id }),
     });
 
     if (!res.ok) throw new Error("Poller returned error");
-    setSyncMessage("Gmail sync triggered — waiting for new CSVs...");
 
-    // 2. Poll for the latest results (no job_id yet, just use latest mode)
-    const resultsPayload = await pollForResults(null, user.id);
+    // ✅ Immediately show success to user
+    setSyncMessage("✅ Sync started — results will appear shortly.");
+    setSyncing(false);
 
-    if (resultsPayload && Array.isArray(resultsPayload.results)) {
-      const formatted = resultsPayload.results.map((i: any) => ({
-        ...i,
-        score: typeof i.tenant_score === "number" ? i.tenant_score : 0,
-      }));
-      setInsights(formatted);
-      setJobSummary(resultsPayload.summary || null);
-      setSyncMessage("✅ Sync complete");
-    } else {
-      setError("Sync did not return valid results");
-    }
+    // 🔄 Kick off background poll for latest results
+    const params = new URLSearchParams();
+    params.set("account_id", user.id);
+    params.set("action", "latest");
+
+    const latestUrl = `${API_BASE}/get_results?${params.toString()}`;
+    console.log("SYNC POLL URL:", latestUrl);
+
+    // Start polling in background (don’t block UI)
+    pollForResults("latest", user.id)
+      .then((resultsPayload) => {
+        if (resultsPayload && Array.isArray(resultsPayload.results)) {
+          const formatted = resultsPayload.results.map((i: any) => ({
+            ...i,
+            score: typeof i.tenant_score === "number" ? i.tenant_score : 0,
+          }));
+          setInsights(formatted);
+          setJobSummary(resultsPayload.summary);
+          console.log("✅ Synced results updated in UI");
+        }
+      })
+      .catch((err) => {
+        console.error("❌ Sync poll failed:", err);
+      });
   } catch (e: any) {
+    console.error("syncNow error:", e);
     setError(e.message || "Failed to trigger sync");
-  } finally {
-    setTimeout(() => setSyncing(false), 3000);
+    setSyncing(false);
   }
 };
 
