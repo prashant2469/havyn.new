@@ -178,6 +178,7 @@ const syncNow = async () => {
   setSyncMessage("Starting Gmail sync...");
 
   try {
+    // 1. Trigger Gmail poller
     const res = await fetch(POLLER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -185,14 +186,33 @@ const syncNow = async () => {
     });
 
     if (!res.ok) throw new Error("Poller returned error");
-    setSyncMessage("Gmail sync triggered — checking for new CSVs...");
-    
-    // Optional: kick off results polling right away
-    // e.g. call pollForResults() with a temporary job_id
-  } catch (e:any) {
+    setSyncMessage("Gmail sync triggered — waiting for new CSVs...");
+
+    // 2. Poll for the latest results (latest mode)
+    const latestParams = new URLSearchParams();
+    latestParams.set("account_id", user.id);
+    latestParams.set("action", "latest");
+
+    const latestUrl = `${API_BASE}/get_results?${latestParams.toString()}`;
+    console.log("SYNC POLL URL:", latestUrl);
+
+    const resultsPayload = await pollForResults(/* job_id not known */, user.id);
+
+    if (resultsPayload && Array.isArray(resultsPayload.results)) {
+      const formatted = resultsPayload.results.map((i: any) => ({
+        ...i,
+        score: typeof i.tenant_score === "number" ? i.tenant_score : 0,
+      }));
+      setInsights(formatted);
+      setJobSummary(resultsPayload.summary || null);
+      setSyncMessage("✅ Sync complete");
+    } else {
+      setError("Sync did not return valid results");
+    }
+  } catch (e: any) {
     setError(e.message || "Failed to trigger sync");
   } finally {
-    setTimeout(() => setSyncing(false), 3000); // auto-hide after a few sec
+    setTimeout(() => setSyncing(false), 3000);
   }
 };
 
@@ -263,7 +283,6 @@ const pollForResults = async (job_id: string, accountIdForJob: string | null) =>
   const maxAttempts = 60;
   const intervalMs = 5000;
 
-  // ✅ ALWAYS construct the query string with URLSearchParams
   const params = new URLSearchParams();
   params.set("job_id", job_id);
   if (accountIdForJob) params.set("account_id", accountIdForJob);
@@ -276,16 +295,13 @@ const pollForResults = async (job_id: string, accountIdForJob: string | null) =>
   while (attempts < maxAttempts) {
     let res: Response;
     try {
-      // ✅ keep request "simple": no custom headers unless needed
       res = await fetch(url, { headers: { Accept: "application/json" } });
     } catch (e) {
-      // If you land here, it's a network/CORS/URL problem
       console.error("❌ POLL fetch failed (network/CORS):", e, "POLL URL:", url);
       throw e;
     }
 
-    // If you get here, we have an HTTP status (200/202/etc)
-    let payloadText = await res.text();
+    const payloadText = await res.text();
     console.log("Poll raw:", payloadText);
 
     let payload: any;
@@ -297,7 +313,8 @@ const pollForResults = async (job_id: string, accountIdForJob: string | null) =>
     }
 
     if (res.status === 200 && payload?.status === "complete" && Array.isArray(payload.results)) {
-      return payload.results;
+      // ✅ return full payload (not just results)
+      return payload;
     }
 
     if (res.status === 202 || payload?.status === "processing") {
@@ -306,7 +323,6 @@ const pollForResults = async (job_id: string, accountIdForJob: string | null) =>
       continue;
     }
 
-    // unexpected: backoff and retry
     await new Promise(r => setTimeout(r, intervalMs));
     attempts++;
   }
@@ -843,22 +859,25 @@ const results = await pollForResults(job_id, accountIdForJob);
       setGeneratingProgress(100);
   
       setTimeout(() => {
-        if (Array.isArray(results)) {
+        if (results && Array.isArray(results.results)) {
           // Map tenant_score to score for frontend display
-          const formattedInsights = results.map(insight => ({
+          const formattedInsights = results.results.map((insight: any) => ({
             ...insight,
-            score: typeof insight.tenant_score === 'number' ? insight.tenant_score : 0,
+            score: typeof insight.tenant_score === "number" ? insight.tenant_score : 0,
           }));
+      
           setInsights(formattedInsights);
+          setJobSummary(results.summary || null);   // ✅ capture summary
           setGeneratingProgress(0);
           setRequestData(null);
           setIsGenerating(false);
         } else {
-          setError('Invalid response format');
+          setError("Invalid response format");
           setInsights([]);
           setIsGenerating(false);
         }
       }, 500);
+
 
   
       // --- Old/Commented-Out Code (for reference) ---
