@@ -272,12 +272,18 @@ useEffect(() => {
 
 // ------- GMAIL OAUTH INTEGRATION SECTION -------
   
-const pollForResults = async (job_id: string, accountIdForJob: string | null) => {
+const pollForResults = async (job_id: string | null, accountIdForJob: string | null) => {
   const maxAttempts = 60;
   const intervalMs = 5000;
 
   const params = new URLSearchParams();
-  params.set("job_id", job_id);
+
+  if (job_id && job_id !== "null") {
+    params.set("job_id", job_id);
+  } else {
+    params.set("action", "latest");
+  }
+
   if (accountIdForJob) params.set("account_id", accountIdForJob);
 
   const url = `${API_BASE}/get_results?${params.toString()}`;
@@ -306,7 +312,6 @@ const pollForResults = async (job_id: string, accountIdForJob: string | null) =>
     }
 
     if (res.status === 200 && payload?.status === "complete" && Array.isArray(payload.results)) {
-      // ✅ return full payload (not just results)
       return payload;
     }
 
