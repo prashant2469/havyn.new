@@ -223,40 +223,40 @@ useEffect(() => {
   })();
 }, [user?.id]);
 
-// ✅ NEW: Fetch latest Analyzer results for this landlord
+// ✅ New (query Supabase tenant_insights directly)
 useEffect(() => {
   if (!user?.id) return;
 
   (async () => {
-    try {
-      const params = new URLSearchParams();
-      params.set("account_id", user.id);
-      params.set("action", "latest"); // ask backend for latest job results
+    const { data, error } = await supabase
+      .from("tenant_insights")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
 
-      const url = `${API_BASE}/get_results?${params.toString()}`;
-      const res = await fetch(url, { headers: { Accept: "application/json" } });
-      const text = await res.text();
+    if (error) {
+      console.error("❌ Failed to fetch tenant_insights:", error);
+      return;
+    }
 
-      let payload: any;
-      try {
-        payload = JSON.parse(text);
-      } catch {
-        console.error("❌ Failed to parse get_results payload", text);
-        return;
-      }
-
-      if (res.status === 200 && payload?.results) {
-        setInsights(payload.results.map((i: any) => ({
+    if (data) {
+      setInsights(
+        data.map((i: any) => ({
           ...i,
           score: typeof i.tenant_score === "number" ? i.tenant_score : 0,
-        })));
-        setJobSummary(payload.summary);
-      }
-    } catch (err) {
-      console.error("❌ Failed to fetch latest insights:", err);
+        }))
+      );
+
+      setJobSummary({
+        total: data.length,
+        new: data.filter(i => i.change_type === "new").length,
+        changed: data.filter(i => i.change_type === "changed").length,
+        unchanged: data.filter(i => i.change_type === "unchanged").length,
+      });
     }
   })();
 }, [user?.id]);
+
 // ------- GMAIL OAUTH INTEGRATION SECTION -------
   
 const pollForResults = async (job_id: string, accountIdForJob: string | null) => {
