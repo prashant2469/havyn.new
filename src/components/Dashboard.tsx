@@ -188,15 +188,8 @@ const syncNow = async () => {
     if (!res.ok) throw new Error("Poller returned error");
     setSyncMessage("Gmail sync triggered — waiting for new CSVs...");
 
-    // 2. Poll for the latest results (latest mode)
-    const latestParams = new URLSearchParams();
-    latestParams.set("account_id", user.id);
-    latestParams.set("action", "latest");
-
-    const latestUrl = `${API_BASE}/get_results?${latestParams.toString()}`;
-    console.log("SYNC POLL URL:", latestUrl);
-
-    const resultsPayload = await pollForResults(/* job_id not known */, user.id);
+    // 2. Poll for the latest results (no job_id yet, just use latest mode)
+    const resultsPayload = await pollForResults(null, user.id);
 
     if (resultsPayload && Array.isArray(resultsPayload.results)) {
       const formatted = resultsPayload.results.map((i: any) => ({
