@@ -41,7 +41,7 @@ export interface LocationInsight {
 export interface TenantInsight {
   id: string;
   tenant_name: string;
-  score: number;
+  tenant_score: number;
   renewal_recommendation: string;
   turnover_risk: string;
   predicted_delinquency: string;
@@ -67,7 +67,7 @@ export interface TenantInsight {
   total_balance: number;
   delinquency_notes: string;
   changes?: {
-    score?: { old: number; new: number };
+    tenant_score?: { old: number; new: number };
     turnover_risk?: { old: string; new: string };
     predicted_delinquency?: { old: string; new: string };
     past_due?: { old: number; new: number };

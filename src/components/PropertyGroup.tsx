@@ -17,7 +17,7 @@ export function PropertyGroup({ property, insights, isExpanded, onToggle, allIns
   const calculateStats = () => {
     const stats = {
       totalUnits: insights.length,
-      highRiskCount: insights.filter(i => i.turnover_risk.toLowerCase() === 'high').length,
+      highRiskCount: insights.filter(i => (i.turnover_risk || '').toLowerCase() === 'high').length,
       retentionNeededCount: insights.filter(i => i.retention_outreach_needed).length,
       rentIncreaseOpportunities: insights.filter(i => i.raise_rent_opportunity).length,
       delinquencyAlerts: insights.filter(i => i.high_delinquency_alert).length,
@@ -26,8 +26,8 @@ export function PropertyGroup({ property, insights, isExpanded, onToggle, allIns
       ),
     };
 
-    const turnoverRisks = insights.map(i => i.turnover_risk.toLowerCase());
-    const delinquencyRisks = insights.map(i => i.predicted_delinquency.toLowerCase());
+    const turnoverRisks = insights.map(i => (i.turnover_risk || 'low').toLowerCase());
+    const delinquencyRisks = insights.map(i => (i.predicted_delinquency || 'low').toLowerCase());
 
     const getPredominantRisk = (risks: string[]) => {
       const counts = { high: 0, medium: 0, low: 0 };
@@ -48,8 +48,8 @@ export function PropertyGroup({ property, insights, isExpanded, onToggle, allIns
 
   const filteredInsights = searchQuery
     ? insights.filter(insight => 
-        insight.tenant_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        insight.unit.toLowerCase().includes(searchQuery.toLowerCase())
+        (insight.tenant_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (insight.unit || '').toLowerCase().includes(searchQuery.toLowerCase())
       )
     : insights;
   

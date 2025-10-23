@@ -12,7 +12,7 @@ interface InsightCardProps {
 }
 
 const getRiskColor = (risk: string): string => {
-  switch (risk.toLowerCase()) {
+  switch ((risk || 'low').toLowerCase()) {
     case 'low':
       return 'bg-green-500';
     case 'medium':
@@ -26,7 +26,7 @@ const getRiskColor = (risk: string): string => {
 };
 
 const getRiskTextColor = (risk: string): string => {
-  switch (risk.toLowerCase()) {
+  switch ((risk || 'low').toLowerCase()) {
     case 'low':
       return 'text-green-700 dark:text-green-400';
     case 'medium':
@@ -40,7 +40,7 @@ const getRiskTextColor = (risk: string): string => {
 };
 
 const RiskBar = ({ risk, type }: { risk: string; type: 'turnover' | 'delinquency' }) => {
-  const riskLevel = risk.toLowerCase();
+  const riskLevel = (risk || 'low').toLowerCase();
   const width = riskLevel === 'high' ? 'w-full' : riskLevel === 'medium' ? 'w-2/3' : 'w-1/3';
   const baseColor = getRiskColor(risk);
   const label = type === 'turnover' ? 'Turnover Risk' : 'Delinquency Risk';
@@ -158,6 +158,9 @@ export function InsightCard({ insight, allInsights = [] }: InsightCardProps) {
   };
   
   console.log("Insight data:", insight);  // Log each individual insight
+  console.log("🔍 DEBUG - InsightCard tenant_score:", insight.tenant_score);
+  console.log("🔍 DEBUG - InsightCard score:", insight.score);
+  console.log("🔍 DEBUG - InsightCard changes:", insight.changes);
 
   return (
     <>
@@ -191,7 +194,7 @@ export function InsightCard({ insight, allInsights = [] }: InsightCardProps) {
                 />
               ) : (
                 <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {typeof insight.score === "number" && !isNaN(insight.score) ? `${insight.score}%` : "N/A"}
+                    {typeof insight.score === "number" && !isNaN(insight.score) && insight.score > 0 ? `${insight.score}%` : "No Score"}
                 </span>
               )}
             </div>
@@ -300,7 +303,7 @@ export function InsightCard({ insight, allInsights = [] }: InsightCardProps) {
             />
           </div>
 
-          {insight.recommended_actions.length > 0 && (
+          {insight.recommended_actions && insight.recommended_actions.length > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
               <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">Recommended Actions</p>
               <ul className="space-y-1">
@@ -310,7 +313,7 @@ export function InsightCard({ insight, allInsights = [] }: InsightCardProps) {
                     <span className="text-gray-600 dark:text-gray-400">{action}</span>
                   </li>
                 ))}
-                {insight.recommended_actions.length > 2 && (
+                {insight.recommended_actions && insight.recommended_actions.length > 2 && (
                   <li className="text-sm text-gray-500 dark:text-gray-400">
                     +{insight.recommended_actions.length - 2} more actions
                   </li>

@@ -7,7 +7,7 @@ interface RiskBarProps {
 
 export function RiskBar({ risk, type }: RiskBarProps) {
   const getBarSegments = () => {
-    switch (risk.toLowerCase()) {
+    switch ((risk || 'low').toLowerCase()) {
       case 'high':
         return ['bg-red-500', 'bg-red-500', 'bg-red-500'];
       case 'medium':

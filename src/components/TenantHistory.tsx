@@ -275,7 +275,7 @@ export function TenantHistory({ insights, onClose }: TenantHistoryProps) {
                               <p>{insight.reasoning_summary}</p>
                             </div>
                           )}
-                          {insight.recommended_actions.length > 0 && (
+                          {insight.recommended_actions && insight.recommended_actions.length > 0 && (
                             <div className="mt-4">
                               <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Recommended Actions</h4>
                               <ul className="space-y-1">
@@ -393,7 +393,7 @@ const formatCurrency = (amount: number) => {
 };
 
 const getRiskColor = (risk: string) => {
-  switch (risk.toLowerCase()) {
+  switch ((risk || 'low').toLowerCase()) {
     case 'high':
       return 'text-red-600 dark:text-red-400';
     case 'medium':
@@ -619,7 +619,7 @@ export function TenantHistory({ insights, onClose }: TenantHistoryProps) {
                             </div>
                           )}
 
-                          {insight.recommended_actions.length > 0 && (
+                          {insight.recommended_actions && insight.recommended_actions.length > 0 && (
                             <div className="mt-4">
                               <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Recommended Actions</h4>
                               <ul className="space-y-1">

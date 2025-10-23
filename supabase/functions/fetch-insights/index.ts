@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { data, error: fetchError } = await supabase
-      .from('tenant_insights')
+      .from('tenant_insights_v2')
       .select('*')
       .order('created_at', { ascending: false });
 

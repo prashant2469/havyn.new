@@ -9,7 +9,7 @@ const corsHeaders = {
 interface TenantInsight {
   id?: string;
   tenant_name: string;
-  score: number;
+  tenant_score: number;
   renewal_recommendation: string;
   turnover_risk: string;
   predicted_delinquency: string;
@@ -36,7 +36,7 @@ interface TenantInsight {
   email: string | null;
   phone_number: string | null;
   changes?: {
-    score?: { old: number; new: number };
+    tenant_score?: { old: number; new: number };
     turnover_risk?: { old: string; new: string };
     predicted_delinquency?: { old: string; new: string };
     past_due?: { old: number; new: number };
@@ -108,16 +108,16 @@ async function findPreviousInsight(
   tenantName: string,
   currentInsightId: string
 ): Promise<TenantInsight | null> {
-  const { data: previousInsights } = await supabase
-    .from('tenant_insights')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('property', property)
-    .eq('unit', unit)
-    .eq('tenant_name', tenantName)
-    .neq('id', currentInsightId)
-    .order('created_at', { ascending: false })
-    .limit(1);
+    const { data: previousInsights } = await supabase
+      .from('tenant_insights_v2')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('property', property)
+      .eq('unit', unit)
+      .eq('tenant_name', tenantName)
+      .neq('id', currentInsightId)
+      .order('created_at', { ascending: false })
+      .limit(1);
 
   return previousInsights?.[0] || null;
 }
@@ -141,7 +141,7 @@ async function updateInsightWithHistory(
     const changes = compareInsights(previousInsight, insight);
     
     await supabase
-      .from('tenant_insights')
+      .from('tenant_insights_v2')
       .update({
         previous_insight_id: previousInsight.id,
         changes
@@ -242,14 +242,14 @@ Deno.serve(async (req) => {
     });
 
     // For testing: return raw Lambda response to frontend
-    return new Response(
-      JSON.stringify({
-        debug: true,
-        rawLambdaResponse: rawLambdaResponse,
-        requestPayload: lambdaPayload
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // return new Response(
+    //   JSON.stringify({
+    //     debug: true,
+    //     rawLambdaResponse: rawLambdaResponse,
+    //     requestPayload: lambdaPayload
+    //   }),
+    //   { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    // );
 
     // Handle different response formats from Lambda
     let insightData;
@@ -319,9 +319,17 @@ Deno.serve(async (req) => {
         t.tenant === item.tenant_name
       );
 
+      console.log('Processing item:', {
+        tenant_name: item.tenant_name,
+        tenant_score: item.tenant_score,
+        score_type: typeof item.tenant_score,
+        has_tenant_score: 'tenant_score' in item,
+        all_keys: Object.keys(item)
+      });
+
       return {
         tenant_name: item.tenant_name || '',
-        score: item.tenant_score,
+        tenant_score: item.tenant_score || item.score || 0,
         renewal_recommendation: item.renewal_recommendation,
         turnover_risk: item.turnover_risk,
         predicted_delinquency: item.predicted_delinquency,
@@ -354,8 +362,14 @@ Deno.serve(async (req) => {
     });
 
     console.log('Inserting insights into database...');
+    console.log('Sample insight to insert:', {
+      tenant_name: insights[0]?.tenant_name,
+      tenant_score: insights[0]?.tenant_score,
+      score_type: typeof insights[0]?.tenant_score
+    });
+    
     const { data: insertedInsights, error: insertError } = await supabase
-      .from('tenant_insights')
+      .from('tenant_insights_v2')
       .insert(insights)
       .select();
 
@@ -364,6 +378,11 @@ Deno.serve(async (req) => {
       throw insertError;
     }
     console.log('Inserted insights count:', insertedInsights.length);
+    console.log('Sample inserted insight:', {
+      tenant_name: insertedInsights[0]?.tenant_name,
+      tenant_score: insertedInsights[0]?.tenant_score,
+      score_type: typeof insertedInsights[0]?.tenant_score
+    });
 
     console.log('Updating insights with history...');
     await Promise.all(

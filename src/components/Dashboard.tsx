@@ -25,6 +25,38 @@ type DelinquencySortField = 'tenant' | 'property' | 'amount' | 'aging';
 
 export function Dashboard() {
   const { user } = useAuth();
+
+  // Debug function - you can call this from browser console
+  (window as any).debugSupabase = async () => {
+    console.log("🔍 DEBUG - Testing Supabase connection...");
+    console.log("🔍 DEBUG - Current user:", user?.id);
+    
+    try {
+      const { data } = await supabase
+        .from("tenant_insights_v2")
+        .select("*");
+      
+      console.log("🔍 DEBUG - All insights:", data?.length || 0);
+      console.log("🔍 DEBUG - Raw data:", data);
+      
+      if (data && data.length > 0) {
+        console.log("🔍 DEBUG - User IDs:", [...new Set(data.map(d => d.user_id))]);
+        console.log("🔍 DEBUG - Sample insight:", data[0]);
+      }
+    } catch (e) {
+      console.error("🔍 DEBUG - Error:", e);
+    }
+  };
+
+  // Add error boundary for React errors
+  React.useEffect(() => {
+    const handleError = (error: ErrorEvent) => {
+      console.error("🚨 React Error:", error.error);
+    };
+    
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
+  }, []);
   const [files, setFiles] = useState<{ [key: string]: File }>({});
   const [mergedData, setMergedData] = useState<TenantData[]>([]);
   const [insights, setInsights] = useState<TenantInsight[]>([]);
@@ -44,7 +76,7 @@ export function Dashboard() {
   const [expandedProperties, setExpandedProperties] = useState<Set<string>>(new Set());
   const [allExpanded, setAllExpanded] = useState(true);
   const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
-  const [selectedTenant, setSelectedTenant] = useState<TenantInsight | null>(null);
+  // const [selectedTenant, setSelectedTenant] = useState<TenantInsight | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'location' | 'delinquency' | 'leases'>('overview');
   const [propertySortField, setPropertySortField] = useState<SortField>('property');
   const [propertySortOrder, setPropertySortOrder] = useState<SortOrder>('asc');
@@ -80,15 +112,11 @@ const propertyMeta: Record<string, { city: string; state: string; postalCode?: s
     city: "Winston-Salem",
     state: "NC",
     postalCode: "27105",
-    defaultBeds: 2,
-    defaultBaths: 1,
   },
   "High Meadow Apartments - 5625 Farm Pond Ln, Charlotte, NC 28212": {
     city: "Charlotte",
     state: "NC",
     postalCode: "28212",
-    defaultBeds: 2,
-    defaultBaths: 2,
   },
   // add more properties here as you go…
 };
@@ -106,7 +134,7 @@ const [syncing, setSyncing] = useState(false);
 const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
 // ------- GMAIL OAUTH INTEGRATION SECTION -------
-const FUNCTIONS_BASE = `${supabase.supabaseUrl}/functions/v1`;
+  // const FUNCTIONS_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 const POLLER_URL = import.meta.env.VITE_POLLER_URL; // set to your Lambda Function URL
 
 
@@ -163,12 +191,195 @@ const connectGmail = async () => {
     const redirect = data?.url ?? data?.authUrl;
     if (!redirect) throw new Error("No auth URL returned from oauth-google-start");
 
-    (window.top ?? window).location.href = redirect;
+    // Open OAuth in popup window instead of redirecting the main page
+    const popup = window.open(
+      redirect,
+      'gmail-oauth',
+      'width=500,height=600,scrollbars=yes,resizable=yes'
+    );
+
+    if (!popup) {
+      throw new Error("Popup blocked. Please allow popups for this site.");
+    }
+
+    // Listen for popup completion
+    const checkClosed = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(checkClosed);
+        setGmailConnecting(false);
+        
+        // Check if Gmail was successfully connected
+        checkGmailStatus();
+      }
+    }, 1000);
+
+    // Listen for message from popup
+    const messageHandler = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      
+      if (event.data.type === 'GMAIL_CONNECTED') {
+        clearInterval(checkClosed);
+        popup.close();
+        window.removeEventListener('message', messageHandler);
+        
+        setGmailConnected(true);
+        setGmailEmail(event.data.email);
+        setGmailConnecting(false);
+        
+        // Generate insights after Gmail connection
+        generateInsightsAfterGmailConnection();
+      } else if (event.data.type === 'GMAIL_ERROR') {
+        clearInterval(checkClosed);
+        popup.close();
+        window.removeEventListener('message', messageHandler);
+        
+        setError(event.data.error || 'Gmail connection failed');
+        setGmailConnecting(false);
+      }
+    };
+
+    window.addEventListener('message', messageHandler);
+
   } catch (e: any) {
     console.error(e);
     setError(e?.message || "Failed to start Gmail connect");
-  } finally {
     setGmailConnecting(false);
+  }
+};
+
+const checkGmailStatus = async () => {
+  if (!user?.id) return;
+
+  try {
+    const { data, error } = await supabase.functions.invoke("gmail-status", {
+      body: { userId: user.id }
+    });
+
+    if (error) {
+      console.error("gmail-status error:", error);
+      return;
+    }
+
+    if (data?.connected) {
+      setGmailConnected(true);
+      setGmailEmail(data.email);
+    } else {
+      setGmailConnected(false);
+      setGmailEmail(null);
+    }
+  } catch (e) {
+    console.error("gmail-status failed:", e);
+  }
+};
+
+const startInsightPolling = () => {
+  if (!user?.id) return;
+
+  console.log("Starting insight polling...");
+  setSyncMessage("Checking for new insights...");
+
+  // Debug: Check what's actually in the database
+  const debugCheck = async () => {
+    try {
+      const { data: allData } = await supabase
+        .from("tenant_insights_v2")
+        .select("*");
+      
+      console.log("DEBUG - All insights in database:", allData?.length || 0);
+      console.log("DEBUG - All data:", allData);
+      
+      if (allData && allData.length > 0) {
+        console.log("DEBUG - User IDs in database:", allData.map(d => d.user_id));
+        console.log("DEBUG - Current user ID:", user.id);
+      }
+    } catch (e) {
+      console.error("DEBUG - Error checking all data:", e);
+    }
+  };
+  
+  debugCheck();
+
+  // Poll every 3 seconds indefinitely until insights are found
+  let pollCount = 0;
+  
+  const pollInterval = setInterval(async () => {
+    pollCount++;
+    
+    try {
+      console.log(`Polling attempt ${pollCount} for user:`, user.id);
+      
+      const { data, error } = await supabase
+        .from("tenant_insights_v2")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (error) {
+        console.error("Error polling insights:", error);
+        setSyncMessage(`Error: ${error.message}`);
+        return;
+      }
+
+      console.log(`Poll ${pollCount} - Found ${data?.length || 0} insights for user ${user.id}`);
+      console.log("Raw data:", data);
+
+      if (data && data.length > 0) {
+        // Found insights! Update the UI
+        const formatted = data.map((i: any) => ({
+          ...i,
+          score: typeof i.tenant_score === "number" && i.tenant_score !== null ? i.tenant_score : (i.score || 0),
+        }));
+        
+        console.log("🔍 DEBUG - Raw data from Supabase:", data[0]);
+        console.log("🔍 DEBUG - tenant_score value:", data[0]?.tenant_score);
+        console.log("🔍 DEBUG - tenant_score type:", typeof data[0]?.tenant_score);
+        console.log("🔍 DEBUG - All fields in data[0]:", Object.keys(data[0]));
+        console.log("🔍 DEBUG - Formatted data:", formatted[0]);
+        console.log("🔍 DEBUG - score value:", formatted[0]?.score);
+        
+        setInsights(formatted);
+        setSyncMessage("✅ New insights loaded!");
+        
+        // Calculate job summary
+        setJobSummary({
+          total: data.length,
+          new: 0, // No change_type column in tenant_insights
+          changed: 0, // No change_type column in tenant_insights
+          unchanged: data.length, // All insights are current
+        });
+        
+        console.log("✅ Insights loaded from Supabase:", formatted.length);
+        clearInterval(pollInterval);
+        return;
+      }
+
+      // No insights yet, continue polling
+      setSyncMessage(`Checking for insights... (attempt ${pollCount})`);
+      
+    } catch (error) {
+      console.error("Error in insight polling:", error);
+      setSyncMessage("Error checking for insights");
+      clearInterval(pollInterval);
+    }
+  }, 3000);
+
+  // Clean up interval if component unmounts
+  return () => clearInterval(pollInterval);
+};
+
+const generateInsightsAfterGmailConnection = async () => {
+  if (!user?.id) return;
+
+  try {
+    console.log("Gmail connected successfully!");
+    setSyncMessage("✅ Gmail connected! You can now sync to generate insights.");
+    
+    // Don't automatically start polling - let user manually sync when ready
+    
+  } catch (e) {
+    console.error("Error in generateInsightsAfterGmailConnection:", e);
+    setError("Failed to complete Gmail connection");
   }
 };
   
@@ -194,30 +405,9 @@ const syncNow = async () => {
     setSyncMessage("✅ Sync started — results will appear shortly.");
     setSyncing(false);
 
-    // 🔄 Kick off background poll for latest results
-    const params = new URLSearchParams();
-    params.set("account_id", user.id);
-    params.set("action", "latest");
-
-    const latestUrl = `${API_BASE}/get_results?${params.toString()}`;
-    console.log("SYNC POLL URL:", latestUrl);
-
-    // Start polling in background (don’t block UI)
-    pollForResults("latest", user.id)
-      .then((resultsPayload) => {
-        if (resultsPayload && Array.isArray(resultsPayload.results)) {
-          const formatted = resultsPayload.results.map((i: any) => ({
-            ...i,
-            score: typeof i.tenant_score === "number" ? i.tenant_score : 0,
-          }));
-          setInsights(formatted);
-          setJobSummary(resultsPayload.summary);
-          console.log("✅ Synced results updated in UI");
-        }
-      })
-      .catch((err) => {
-        console.error("❌ Sync poll failed:", err);
-      });
+    // 🔄 Start polling Supabase for results instead of Lambda
+    startInsightPolling();
+    
   } catch (e: any) {
     console.error("syncNow error:", e);
     setError(e.message || "Failed to trigger sync");
@@ -252,38 +442,137 @@ useEffect(() => {
   })();
 }, [user?.id]);
 
-// ✅ New (query Supabase tenant_insights directly)
+// ✅ Load insights on page load
 useEffect(() => {
   if (!user?.id) return;
 
+  console.log("Loading insights on page load for user:", user.id);
+
   (async () => {
-    const { data, error } = await supabase
-      .from("tenant_insights")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+    try {
+      // First, let's see what's actually in the database
+      const { data: allData } = await supabase
+        .from("tenant_insights_v2")
+        .select("*");
+      
+      console.log("🔍 DEBUG - All insights in database:", allData?.length || 0);
+      if (allData && allData.length > 0) {
+        console.log("🔍 DEBUG - Sample insight:", allData[0]);
+        console.log("🔍 DEBUG - All user IDs:", [...new Set(allData.map(d => d.user_id))]);
+      }
 
-    if (error) {
-      console.error("❌ Failed to fetch tenant_insights:", error);
-      return;
-    }
+      // Now try to get insights for current user
+      const { data, error } = await supabase
+        .from("tenant_insights_v2")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(5);
 
-    if (data) {
-      setInsights(
-        data.map((i: any) => ({
-          ...i,
-          score: typeof i.tenant_score === "number" ? i.tenant_score : 0,
-        }))
-      );
+      if (error) {
+        console.error("❌ Failed to fetch tenant_insights:", error);
+        return;
+      }
 
-      setJobSummary({
-        total: data.length,
-        new: data.filter(i => i.change_type === "new").length,
-        changed: data.filter(i => i.change_type === "changed").length,
-        unchanged: data.filter(i => i.change_type === "unchanged").length,
-      });
+      console.log("🔍 DEBUG - Found insights for current user:", data?.length || 0);
+      console.log("🔍 DEBUG - Current user ID:", user.id);
+
+      if (data && data.length > 0) {
+        console.log("✅ Loading insights into UI:", data.length);
+        console.log("🔍 DEBUG - Sample insight structure:", data[0]);
+        
+        try {
+          const formatted = data.map((i: any) => ({
+            ...i,
+            score: typeof i.tenant_score === "number" ? i.tenant_score : 0,
+          }));
+          
+          console.log("🔍 DEBUG - Raw Supabase data:", data[0]);
+          console.log("🔍 DEBUG - tenant_score from DB:", data[0]?.tenant_score);
+          console.log("🔍 DEBUG - Formatted insights:", formatted[0]);
+          console.log("🔍 DEBUG - score after formatting:", formatted[0]?.score);
+          
+          setInsights(formatted);
+
+          setJobSummary({
+            total: data.length,
+            new: 0, // No change_type column in tenant_insights_v2
+            changed: 0, // No change_type column in tenant_insights_v2
+            unchanged: data.length, // All insights are current
+          });
+          
+          console.log("✅ Successfully loaded insights into UI");
+        } catch (error) {
+          console.error("❌ Error processing insights data:", error);
+          console.error("❌ Problematic data:", data[0]);
+        }
+      } else {
+        console.log("⚠️ No insights found for current user");
+      }
+    } catch (e) {
+      console.error("❌ Error loading insights:", e);
     }
   })();
+}, [user?.id]);
+
+// Real-time subscription for new insights
+useEffect(() => {
+  if (!user?.id) return;
+
+  console.log("Setting up real-time subscription for insights...");
+  
+  const subscription = supabase
+    .channel('tenant_insights_changes')
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'tenant_insights_v2',
+        filter: `user_id=eq.${user.id}`
+      },
+      (payload) => {
+        console.log('New insight received:', payload);
+        setSyncMessage("✅ New insights received!");
+        
+        // Refresh insights from database
+        supabase
+          .from("tenant_insights_v2")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(5)
+          .then(({ data, error }) => {
+            if (error) {
+              console.error("Error refreshing insights:", error);
+              return;
+            }
+            
+            if (data) {
+              const formatted = data.map((i: any) => ({
+                ...i,
+                score: typeof i.tenant_score === "number" ? i.tenant_score : 0,
+              }));
+              
+              setInsights(formatted);
+              setJobSummary({
+                total: data.length,
+                new: 0, // No change_type column in tenant_insights_v2
+                changed: 0, // No change_type column in tenant_insights_v2
+                unchanged: data.length, // All insights are current
+              });
+              
+              console.log("✅ Insights updated via real-time subscription");
+            }
+          });
+      }
+    )
+    .subscribe();
+
+  return () => {
+    console.log("Cleaning up real-time subscription");
+    subscription.unsubscribe();
+  };
 }, [user?.id]);
 
 // ------- GMAIL OAUTH INTEGRATION SECTION -------
@@ -400,7 +689,7 @@ type SavedRun = {
 };
 
 const [savedRuns, setSavedRuns] = useState<SavedRun[]>([]);
-const [loadingSaved, setLoadingSaved] = useState(false);
+  // const [loadingSaved, setLoadingSaved] = useState(false);
 const [showSavedRunsList, setShowSavedRunsList] = useState(false);
 
 const loadSavedRun = async (jobId: string, accountId: string) => {
@@ -535,7 +824,7 @@ const fetchSavedInsights = async () => {
         };
       }
   
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/merge-data`, {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/merge-data`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -572,10 +861,11 @@ const fetchSavedInsights = async () => {
       
       // Fetch existing tenant insights from database
       const { data: existingInsights, error } = await supabase
-        .from('tenant_insights')
+        .from('tenant_insights_v2')
         .select('*')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(5);
 
       if (error) {
         console.error('Error fetching existing insights:', error);
@@ -735,7 +1025,7 @@ const fetchSavedInsights = async () => {
       
       setRequestData(JSON.stringify(requestBody, null, 2));
 
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/generate-insights`, {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-insights`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -896,7 +1186,7 @@ const results = await pollForResults(job_id, accountIdForJob);
   
       // --- Old/Commented-Out Code (for reference) ---
       /*
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/generate-insights`, {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-insights`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1020,10 +1310,10 @@ const results = await pollForResults(job_id, accountIdForJob);
     };
 
     insightsArray.forEach(insight => {
-      const turnoverRisk = insight.turnover_risk.toLowerCase() as 'low' | 'medium' | 'high';
+      const turnoverRisk = (insight.turnover_risk || 'low').toLowerCase() as 'low' | 'medium' | 'high';
       turnoverRisks[turnoverRisk]++;
 
-      const delinquencyRisk = insight.predicted_delinquency.toLowerCase() as 'low' | 'medium' | 'high';
+      const delinquencyRisk = (insight.predicted_delinquency || 'low').toLowerCase() as 'low' | 'medium' | 'high';
       delinquencyRisks[delinquencyRisk]++;
     });
 
@@ -1035,17 +1325,17 @@ const results = await pollForResults(job_id, accountIdForJob);
       averageRent,
       delinquentCount,
       upcomingLeases,
-      highRiskCount: insightsArray.filter(i => i.turnover_risk.toLowerCase() === 'high').length,
+      highRiskCount: insightsArray.filter(i => (i.turnover_risk || '').toLowerCase() === 'high').length,
       retentionNeeded: insightsArray.filter(i => i.retention_outreach_needed).length,
       rentIncreaseOpportunities: insightsArray.filter(i => i.raise_rent_opportunity).length,
       averageScore: Math.round(
-        insightsArray.reduce((sum, insight) => sum + insight.score, 0) / insightsArray.length
+        insightsArray.reduce((sum, insight) => sum + insight.tenant_score, 0) / insightsArray.length
       )
     };
   };
 
-  const handleTenantClick = (tenant: TenantInsight) => {
-    setSelectedTenant(tenant);
+  const handleTenantClick = (_tenant: TenantInsight) => {
+        // setSelectedTenant(tenant);
   };
 
   const handlePropertySort = (field: SortField) => {
@@ -1061,8 +1351,8 @@ const results = await pollForResults(job_id, accountIdForJob);
     // First, filter properties based on search
     const filteredGroups = Object.entries(propertyGroups).reduce((acc, [property, insights]) => {
       const matchingInsights = insights.filter(insight => 
-        insight.tenant_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        insight.unit.toLowerCase().includes(searchQuery.toLowerCase())
+        (insight.tenant_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (insight.unit || '').toLowerCase().includes(searchQuery.toLowerCase())
       );
       
       if (matchingInsights.length > 0) {
@@ -1089,12 +1379,12 @@ const results = await pollForResults(job_id, accountIdForJob);
         case 'units':
           return compareValue(insightsA.length, insightsB.length);
         case 'score':
-          const avgScoreA = insightsA.reduce((sum, i) => sum + i.score, 0) / insightsA.length;
-          const avgScoreB = insightsB.reduce((sum, i) => sum + i.score, 0) / insightsB.length;
+          const avgScoreA = insightsA.reduce((sum, i) => sum + i.tenant_score, 0) / insightsA.length;
+          const avgScoreB = insightsB.reduce((sum, i) => sum + i.tenant_score, 0) / insightsB.length;
           return compareValue(avgScoreA, avgScoreB);
         case 'risk':
-          const riskCountA = insightsA.filter(i => i.turnover_risk.toLowerCase() === 'high').length;
-          const riskCountB = insightsB.filter(i => i.turnover_risk.toLowerCase() === 'high').length;
+    const riskCountA = insightsA.filter(i => (i.turnover_risk || '').toLowerCase() === 'high').length;
+    const riskCountB = insightsB.filter(i => (i.turnover_risk || '').toLowerCase() === 'high').length;
           return compareValue(riskCountA, riskCountB);
         case 'delinquency':
           const delinqCountA = insightsA.filter(i => i.high_delinquency_alert).length;
@@ -1488,7 +1778,7 @@ const results = await pollForResults(job_id, accountIdForJob);
                   onClick={async () => {
                     setShowSavedRunsList(false);
                     const results = await loadSavedRun(report.job_id, user?.id || '');
-                    const formattedInsights = results.map(insight => ({
+                    const formattedInsights = results.map((insight: any) => ({
                       ...insight,
                       score: typeof insight.tenant_score === 'number' ? insight.tenant_score : 0,
                     }));

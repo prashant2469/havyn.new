@@ -139,7 +139,7 @@ export default function LocationInsights({ insights, propertyLatLng, propertyMet
       const lat = firstWithCoords?.lat ?? latLng?.latitude;
       const lng = firstWithCoords?.lng ?? latLng?.longitude;
       const currentAvgRent = tenants.length ? Math.round( tenants.reduce((s,t)=> s + toNum(t.rent_amount), 0) / tenants.length ) : 0;
-      const sumScore = tenants.reduce((s,t)=> s + (Number.isFinite(t.tenant_score)? (t.tenant_score as number) : 0), 0);
+        const sumScore = tenants.reduce((s,t)=> s + (Number.isFinite(t.tenant_score)? (t.tenant_score as number) : 0), 0);
       const avgScore = tenants.length ? Math.round((sumScore/tenants.length)*10)/10 : 0;
       const totalRevenue = tenants.reduce((s,t)=> s + toNum(t.rent_amount), 0);
       return { property, units: tenants.length, avgScore, totalRevenue, lat, lng, currentAvgRent };
@@ -572,7 +572,7 @@ export function LocationInsights({ insights }: LocationInsightsProps) {
     if (!searchQuery) return locationInsights;
     const query = searchQuery.toLowerCase();
     return locationInsights.filter(location => 
-      location.property.toLowerCase().includes(query)
+      (location.property || '').toLowerCase().includes(query)
     );
   }, [locationInsights, searchQuery]);
 
@@ -727,7 +727,7 @@ export function LocationInsights({ insights }: LocationInsightsProps) {
 
   const getTrendDisplay = (trend: string) => {
     const getTrendIcon = () => {
-      switch (trend.toLowerCase()) {
+      switch ((trend || 'stable').toLowerCase()) {
         case 'increasing':
           return <TrendingUp className="w-4 h-4 text-green-500" />;
         case 'stable':
@@ -738,7 +738,7 @@ export function LocationInsights({ insights }: LocationInsightsProps) {
     };
 
     const getTrendColor = () => {
-      switch (trend.toLowerCase()) {
+      switch ((trend || 'stable').toLowerCase()) {
         case 'increasing':
           return 'text-green-500';
         case 'stable':
@@ -761,7 +761,7 @@ export function LocationInsights({ insights }: LocationInsightsProps) {
 
   const getConstructionDisplay = (supply: string) => {
     const getSupplyIcon = () => {
-      switch (supply.toLowerCase()) {
+      switch ((supply || 'balanced').toLowerCase()) {
         case 'low':
           return <Construction className="w-4 h-4 text-green-500" />;
         case 'moderate':
@@ -772,7 +772,7 @@ export function LocationInsights({ insights }: LocationInsightsProps) {
     };
 
     const getSupplyColor = () => {
-      switch (supply.toLowerCase()) {
+      switch ((supply || 'balanced').toLowerCase()) {
         case 'low':
           return 'text-green-500';
         case 'moderate':
