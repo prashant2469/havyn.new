@@ -59,6 +59,13 @@ const getRiskColor = (risk: string) => {
   }
 };
 
+const getScoreColor = (score: number) => {
+  if (score >= 80) return 'text-green-600 dark:text-green-400';
+  if (score >= 60) return 'text-yellow-600 dark:text-yellow-400';
+  if (score >= 40) return 'text-orange-600 dark:text-orange-400';
+  return 'text-red-600 dark:text-red-400';
+};
+
 export function TenantHistory({ insights, onClose }: TenantHistoryProps) {
   // --------- PATCHED SORT ----------
   const sortedInsights = [...insights].sort((a, b) => {
@@ -315,7 +322,7 @@ export function TenantHistory({ insights, onClose }: TenantHistoryProps) {
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 shadow-sm space-y-4">
                 <div>
                   <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Current Score</div>
-                  <div className="text-2xl font-bold text-havyn-primary dark:text-green-400">
+                  <div className={`text-2xl font-bold ${getScoreColor(sortedInsights[0]?.tenant_score || 0)}`}>
                     {sortedInsights[0]?.tenant_score || 0}%
                   </div>
                 </div>

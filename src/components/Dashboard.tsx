@@ -417,6 +417,11 @@ const startInsightPolling = () => {
         setSyncMessage("✅ Insights loaded successfully!");
         setSyncing(false);
         
+        // Mark that user has synced successfully (for future page loads)
+        if (user?.id) {
+          localStorage.setItem(`hasSync_${user.id}`, 'true');
+        }
+        
         // Calculate job summary
         setJobSummary({
           total: data.length,
@@ -533,9 +538,17 @@ useEffect(() => {
   })();
 }, [user?.id]);
 
-// ✅ Load insights on page load - DON'T show them until after sync
+// ✅ Load insights on page load - ONLY if user has synced before
 useEffect(() => {
   if (!user?.id) return;
+
+  // Check if user has ever synced (stored in localStorage)
+  const hasEverSynced = localStorage.getItem(`hasSync_${user.id}`) === 'true';
+  
+  if (!hasEverSynced) {
+    console.log("⚠️ User has never synced. Not loading insights on page load.");
+    return;
+  }
 
   console.log("Loading insights on page load for user:", user.id);
 
