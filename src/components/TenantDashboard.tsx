@@ -206,13 +206,13 @@ export function TenantDashboard() {
         month: 'short',
         day: 'numeric'
       }),
-      score: insight.score,
+      score: insight.tenant_score || 0,
       fullDate: new Date(insight.created_at).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       }),
-      change: index > 0 ? insight.score - sortedInsights[index - 1].score : 0,
+      change: index > 0 ? (insight.tenant_score || 0) - (sortedInsights[index - 1].tenant_score || 0) : 0,
       turnoverRisk: insight.turnover_risk,
       delinquencyRisk: insight.predicted_delinquency,
       timestamp: new Date(insight.created_at).getTime()
@@ -482,15 +482,15 @@ export function TenantDashboard() {
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-4">
                   <div className="text-center">
-                    <div className={`text-4xl font-bold ${getScoreColor(primaryInsight.score)}`}>
-                      {primaryInsight.score}
+                    <div className={`text-4xl font-bold ${getScoreColor(primaryInsight.tenant_score || 0)}`}>
+                      {primaryInsight.tenant_score || 0}
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">out of 100</div>
                   </div>
                   <div className="h-12 w-px bg-gray-200 dark:bg-gray-700"></div>
                   <div>
-                    <div className={`text-lg font-semibold ${getScoreColor(primaryInsight.score)}`}>
-                      {getScoreLabel(primaryInsight.score)}
+                    <div className={`text-lg font-semibold ${getScoreColor(primaryInsight.tenant_score || 0)}`}>
+                      {getScoreLabel(primaryInsight.tenant_score || 0)}
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">
                       Performance Rating
@@ -538,15 +538,15 @@ export function TenantDashboard() {
               <div className="mb-6">
                 <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
                   <span>Score Progress</span>
-                  <span>{primaryInsight.score}%</span>
+                  <span>{primaryInsight.tenant_score || 0}%</span>
                 </div>
                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
                   <div 
                     className={`h-3 rounded-full transition-all duration-500 ${
-                      primaryInsight.score >= 80 ? 'bg-green-500' :
-                      primaryInsight.score >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                      (primaryInsight.tenant_score || 0) >= 80 ? 'bg-green-500' :
+                      (primaryInsight.tenant_score || 0) >= 60 ? 'bg-yellow-500' : 'bg-red-500'
                     }`}
-                    style={{ width: `${primaryInsight.score}%` }}
+                    style={{ width: `${primaryInsight.tenant_score || 0}%` }}
                   ></div>
                 </div>
               </div>
@@ -613,12 +613,12 @@ export function TenantDashboard() {
                     }`} />
                     <h4 className="font-semibold text-gray-900 dark:text-white">
                       {hasPastDue ? 'Immediate Action Required' :
-                       primaryInsight.score >= 80 ? 'Maintain Excellence' : 
-                       primaryInsight.score >= 60 ? 'Improvement Tips' : 'Action Plan'}
+                       (primaryInsight.tenant_score || 0) >= 80 ? 'Maintain Excellence' : 
+                       (primaryInsight.tenant_score || 0) >= 60 ? 'Improvement Tips' : 'Action Plan'}
                     </h4>
                   </div>
                   <ul className="space-y-2">
-                    {getRecommendations(primaryInsight.score, hasPastDue).map((recommendation, index) => (
+                    {getRecommendations(primaryInsight.tenant_score || 0, hasPastDue).map((recommendation, index) => (
                       <li key={index} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
                         <CheckCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
                           hasPastDue ? 'text-red-500' : 'text-green-500'

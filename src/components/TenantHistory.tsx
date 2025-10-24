@@ -78,7 +78,7 @@ export function TenantHistory({ insights, onClose }: TenantHistoryProps) {
     datasets: [
       {
         label: 'Tenant Score',
-        data: sortedInsights.map(insight => Math.round((insight.score / 100) * 100)),
+        data: sortedInsights.map(insight => Math.round(((insight.tenant_score || 0) / 100) * 100)),
         borderColor: '#22c55e',
         backgroundColor: '#22c55e',
         tension: 0.4,
@@ -237,10 +237,10 @@ export function TenantHistory({ insights, onClose }: TenantHistoryProps) {
                               <div className="space-y-2 text-sm">
                                 <div className="flex justify-between">
                                   <span className="text-gray-500 dark:text-gray-400">Tenant Score:</span>
-                                  {previousInsight && insight.changes?.score ? (
-                                    getChangeIndicator(insight.changes.score.old, insight.changes.score.new)
+                                  {previousInsight && insight.changes?.tenant_score ? (
+                                    getChangeIndicator(insight.changes.tenant_score.old, insight.changes.tenant_score.new)
                                   ) : (
-                                    <span className="font-medium text-gray-900 dark:text-white">{insight.score}</span>
+                                    <span className="font-medium text-gray-900 dark:text-white">{insight.tenant_score || 0}</span>
                                   )}
                                 </div>
                                 <div className="flex justify-between">
@@ -316,7 +316,7 @@ export function TenantHistory({ insights, onClose }: TenantHistoryProps) {
                 <div>
                   <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Current Score</div>
                   <div className="text-2xl font-bold text-havyn-primary dark:text-green-400">
-                    {Math.round((sortedInsights[0]?.score / 100) * 100)}%
+                    {sortedInsights[0]?.tenant_score || 0}%
                   </div>
                 </div>
                 <div>
@@ -324,8 +324,8 @@ export function TenantHistory({ insights, onClose }: TenantHistoryProps) {
                   <div className="flex items-center gap-2">
                     {sortedInsights.length > 1 && (
                       getChangeIndicator(
-                        Math.round((sortedInsights[1]?.score / 100) * 100),
-                        Math.round((sortedInsights[0]?.score / 100) * 100)
+                        sortedInsights[1]?.tenant_score || 0,
+                        sortedInsights[0]?.tenant_score || 0
                       )
                     )}
                   </div>
@@ -417,7 +417,7 @@ export function TenantHistory({ insights, onClose }: TenantHistoryProps) {
     datasets: [
       {
         label: 'Tenant Score',
-        data: sortedInsights.map(insight => Math.round((insight.score / 100) * 100)),
+        data: sortedInsights.map(insight => Math.round(((insight.tenant_score || 0) / 100) * 100)),
         borderColor: '#22c55e',
         backgroundColor: '#22c55e',
         tension: 0.4,
@@ -579,10 +579,10 @@ export function TenantHistory({ insights, onClose }: TenantHistoryProps) {
                               <div className="space-y-2 text-sm">
                                 <div className="flex justify-between">
                                   <span className="text-gray-500 dark:text-gray-400">Tenant Score:</span>
-                                  {previousInsight && insight.changes?.score ? (
-                                    getChangeIndicator(insight.changes.score.old, insight.changes.score.new)
+                                  {previousInsight && insight.changes?.tenant_score ? (
+                                    getChangeIndicator(insight.changes.tenant_score.old, insight.changes.tenant_score.new)
                                   ) : (
-                                    <span className="font-medium text-gray-900 dark:text-white">{insight.score}</span>
+                                    <span className="font-medium text-gray-900 dark:text-white">{insight.tenant_score || 0}</span>
                                   )}
                                 </div>
                                 <div className="flex justify-between">

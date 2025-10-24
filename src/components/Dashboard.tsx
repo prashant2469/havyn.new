@@ -83,6 +83,7 @@ export function Dashboard() {
   const [delinquencySortField, setDelinquencySortField] = useState<DelinquencySortField>('amount');
   const [delinquencySortOrder, setDelinquencySortOrder] = useState<SortOrder>('desc');
   const [searchQuery, setSearchQuery] = useState('');
+  const [renewalFilter, setRenewalFilter] = useState<'all' | 'renew' | 'do_not_renew'>('all');
   const [analysisResults, setAnalysisResults] = useState<{
     totalRows: number;
     unchangedRows: number;
@@ -101,22 +102,37 @@ const propertyLatLng = {
     latitude: 36.1170555787963, 
     longitude: -80.20638809515557,
   },
+  "Villas at Park Terrace - 301 Walkertown Ave Winston-Salem, NC 27105": {
+    latitude: 36.1170555787963, 
+    longitude: -80.20638809515557,
+  },
   "High Meadow Apartments - 5625 Farm Pond Ln, Charlotte, NC 28212": {
     latitude: 35.1827,
     longitude: -80.7414,
   },
 };
 
-const propertyMeta: Record<string, { city: string; state: string; postalCode?: string }> = {
+const propertyMeta: Record<string, { city: string; state: string; postalCode?: string; defaultBeds?: number; defaultBaths?: number }> = {
   "The Villas at Park Terrace - 301 Walkertown Ave Winston Salem, NC 27105": {
     city: "Winston-Salem",
     state: "NC",
     postalCode: "27105",
+    defaultBeds: 2,
+    defaultBaths: 1,
+  },
+  "Villas at Park Terrace - 301 Walkertown Ave Winston-Salem, NC 27105": {
+    city: "Winston-Salem",
+    state: "NC",
+    postalCode: "27105",
+    defaultBeds: 2,
+    defaultBaths: 1,
   },
   "High Meadow Apartments - 5625 Farm Pond Ln, Charlotte, NC 28212": {
     city: "Charlotte",
     state: "NC",
     postalCode: "28212",
+    defaultBeds: 2,
+    defaultBaths: 1,
   },
   // add more properties here as you go…
 };
@@ -132,6 +148,9 @@ const [jobSummary, setJobSummary] = useState<{
 
 const [syncing, setSyncing] = useState(false);
 const [syncMessage, setSyncMessage] = useState<string | null>(null);
+const [syncStarted, setSyncStarted] = useState(false);
+const [estimatedProgress, setEstimatedProgress] = useState(0);
+const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<number | null>(null);
 
 // ------- GMAIL OAUTH INTEGRATION SECTION -------
   // const FUNCTIONS_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
@@ -276,7 +295,26 @@ const startInsightPolling = () => {
   if (!user?.id) return;
 
   console.log("Starting insight polling...");
-  setSyncMessage("Checking for new insights...");
+  setSyncMessage("Processing your data...");
+  setEstimatedProgress(0);
+  
+  const startTime = Date.now();
+  
+  // Estimate: ~250 tenants, ~30 sec avg processing time
+  // Progress simulation: logarithmic curve to feel natural
+  const progressInterval = setInterval(() => {
+    const elapsed = (Date.now() - startTime) / 1000; // seconds
+    
+    // Logarithmic progress: fast at first, slows down near completion
+    // Reaches ~90% at 30 seconds, never hits 100% until real data arrives
+    const progress = Math.min(90, Math.log(elapsed + 1) * 25);
+    setEstimatedProgress(progress);
+    
+    // Estimate time remaining (simple linear interpolation)
+    const estimatedTotal = 30; // 30 seconds average
+    const remaining = Math.max(0, estimatedTotal - elapsed);
+    setEstimatedTimeRemaining(Math.ceil(remaining));
+  }, 500);
 
   // Debug: Check what's actually in the database
   const debugCheck = async () => {
@@ -307,28 +345,59 @@ const startInsightPolling = () => {
     
     try {
       console.log(`Polling attempt ${pollCount} for user:`, user.id);
+      console.log("🔍 DEBUG - User object:", user);
+      console.log("🔍 DEBUG - User ID type:", typeof user.id);
       
       const { data, error } = await supabase
         .from("tenant_insights_v2")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
-        .limit(5);
 
       if (error) {
         console.error("Error polling insights:", error);
         setSyncMessage(`Error: ${error.message}`);
+        clearInterval(progressInterval);
         return;
       }
 
       console.log(`Poll ${pollCount} - Found ${data?.length || 0} insights for user ${user.id}`);
       console.log("Raw data:", data);
+      
+      // Enhanced debugging
+      if (data && data.length > 0) {
+        console.log("🔍 DETAILED DEBUG - First insight object:", JSON.stringify(data[0], null, 2));
+        console.log("🔍 DETAILED DEBUG - tenant_score specifically:", data[0]?.tenant_score);
+        console.log("🔍 DETAILED DEBUG - Is tenant_score null?", data[0]?.tenant_score === null);
+        console.log("🔍 DETAILED DEBUG - Is tenant_score undefined?", data[0]?.tenant_score === undefined);
+        console.log("🔍 DETAILED DEBUG - tenant_score type:", typeof data[0]?.tenant_score);
+      } else {
+        console.log("🔍 DEBUG - No insights found in tenant_insights_v2 for user:", user.id);
+        console.log("🔍 DEBUG - This means either:");
+        console.log("  1. No data exists in tenant_insights_v2 for this user");
+        console.log("  2. Wrong user ID");
+        console.log("  3. Data exists but in different table");
+        
+        // Let's check if there's ANY data in the table
+        console.log("🔍 DEBUG - Checking if ANY data exists in tenant_insights_v2...");
+        const { data: anyData, error: anyError } = await supabase
+          .from("tenant_insights_v2")
+          .select("user_id, tenant_score, created_at")
+          .limit(5);
+        
+        if (anyError) {
+          console.log("🔍 DEBUG - Error checking for any data:", anyError);
+        } else {
+          console.log("🔍 DEBUG - Found data in tenant_insights_v2:", anyData);
+          console.log("🔍 DEBUG - User IDs in table:", anyData?.map(d => d.user_id));
+        }
+      }
 
       if (data && data.length > 0) {
         // Found insights! Update the UI
         const formatted = data.map((i: any) => ({
           ...i,
-          score: typeof i.tenant_score === "number" && i.tenant_score !== null ? i.tenant_score : (i.score || 0),
+          // Keep tenant_score as is - InsightCard will use tenant_score directly
         }));
         
         console.log("🔍 DEBUG - Raw data from Supabase:", data[0]);
@@ -336,10 +405,17 @@ const startInsightPolling = () => {
         console.log("🔍 DEBUG - tenant_score type:", typeof data[0]?.tenant_score);
         console.log("🔍 DEBUG - All fields in data[0]:", Object.keys(data[0]));
         console.log("🔍 DEBUG - Formatted data:", formatted[0]);
-        console.log("🔍 DEBUG - score value:", formatted[0]?.score);
+        console.log("🔍 DEBUG - tenant_score value:", formatted[0]?.tenant_score);
+        
+        // DEBUG: Log unique property names to help configure propertyLatLng
+        const uniqueProperties = [...new Set(data.map((i: any) => i.property))];
+        console.log("📍 DEBUG - Unique property names in your data:", uniqueProperties);
+        console.log("📍 DEBUG - You need to add these property names to propertyLatLng in Dashboard.tsx");
         
         setInsights(formatted);
-        setSyncMessage("✅ New insights loaded!");
+        setEstimatedProgress(100);
+        setSyncMessage("✅ Insights loaded successfully!");
+        setSyncing(false);
         
         // Calculate job summary
         setJobSummary({
@@ -351,21 +427,34 @@ const startInsightPolling = () => {
         
         console.log("✅ Insights loaded from Supabase:", formatted.length);
         clearInterval(pollInterval);
+        clearInterval(progressInterval);
+        
+        // Reset progress after 2 seconds
+        setTimeout(() => {
+          setEstimatedProgress(0);
+          setEstimatedTimeRemaining(null);
+        }, 2000);
+        
         return;
       }
 
       // No insights yet, continue polling
-      setSyncMessage(`Checking for insights... (attempt ${pollCount})`);
+      setSyncMessage(`Processing tenants... (${Math.round(estimatedProgress)}% complete)`);
       
     } catch (error) {
       console.error("Error in insight polling:", error);
       setSyncMessage("Error checking for insights");
       clearInterval(pollInterval);
+      clearInterval(progressInterval);
+      setSyncing(false);
     }
   }, 3000);
 
   // Clean up interval if component unmounts
-  return () => clearInterval(pollInterval);
+  return () => {
+    clearInterval(pollInterval);
+    clearInterval(progressInterval);
+  };
 };
 
 const generateInsightsAfterGmailConnection = async () => {
@@ -390,7 +479,9 @@ const syncNow = async () => {
   }
 
   setSyncing(true);
+  setSyncStarted(true);
   setSyncMessage("Starting Gmail sync...");
+  setInsights([]); // Clear existing insights when starting sync
 
   try {
     const res = await fetch(POLLER_URL, {
@@ -402,8 +493,7 @@ const syncNow = async () => {
     if (!res.ok) throw new Error("Poller returned error");
 
     // ✅ Immediately show success to user
-    setSyncMessage("✅ Sync started — results will appear shortly.");
-    setSyncing(false);
+    setSyncMessage("Processing your data...");
 
     // 🔄 Start polling Supabase for results instead of Lambda
     startInsightPolling();
@@ -412,6 +502,7 @@ const syncNow = async () => {
     console.error("syncNow error:", e);
     setError(e.message || "Failed to trigger sync");
     setSyncing(false);
+    setSyncStarted(false);
   }
 };
 
@@ -442,7 +533,7 @@ useEffect(() => {
   })();
 }, [user?.id]);
 
-// ✅ Load insights on page load
+// ✅ Load insights on page load - DON'T show them until after sync
 useEffect(() => {
   if (!user?.id) return;
 
@@ -466,8 +557,7 @@ useEffect(() => {
         .from("tenant_insights_v2")
         .select("*")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(5);
+        .order("created_at", { ascending: false });
 
       if (error) {
         console.error("❌ Failed to fetch tenant_insights:", error);
@@ -492,14 +582,23 @@ useEffect(() => {
           console.log("🔍 DEBUG - Formatted insights:", formatted[0]);
           console.log("🔍 DEBUG - score after formatting:", formatted[0]?.score);
           
-          setInsights(formatted);
-
-          setJobSummary({
-            total: data.length,
-            new: 0, // No change_type column in tenant_insights_v2
-            changed: 0, // No change_type column in tenant_insights_v2
-            unchanged: data.length, // All insights are current
-          });
+          // DEBUG: Log unique property names to help configure propertyLatLng
+          const uniqueProperties = [...new Set(data.map((i: any) => i.property))];
+          console.log("📍 DEBUG - Unique property names in your data:", uniqueProperties);
+          console.log("📍 DEBUG - You need to add these property names to propertyLatLng in Dashboard.tsx");
+          
+          // Only set insights if sync hasn't started (i.e., showing cached data)
+          // If sync started, don't show old data
+          if (!syncStarted) {
+            setInsights(formatted);
+            
+            setJobSummary({
+              total: data.length,
+              new: 0, // No change_type column in tenant_insights_v2
+              changed: 0, // No change_type column in tenant_insights_v2
+              unchanged: data.length, // All insights are current
+            });
+          }
           
           console.log("✅ Successfully loaded insights into UI");
         } catch (error) {
@@ -513,7 +612,7 @@ useEffect(() => {
       console.error("❌ Error loading insights:", e);
     }
   })();
-}, [user?.id]);
+}, [user?.id, syncStarted]);
 
 // Real-time subscription for new insights
 useEffect(() => {
@@ -1348,13 +1447,21 @@ const results = await pollForResults(job_id, accountIdForJob);
   };
 
   const filterAndSortProperties = () => {
-    // First, filter properties based on search
+    // Only apply renewal filter at Dashboard level, let PropertyGroup handle search
     const filteredGroups = Object.entries(propertyGroups).reduce((acc, [property, insights]) => {
-      const matchingInsights = insights.filter(insight => 
-        (insight.tenant_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (insight.unit || '').toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      const matchingInsights = insights.filter(insight => {
+        // Only apply renewal filter here (search is handled by PropertyGroup)
+        if (renewalFilter !== 'all') {
+          const renewal = (insight.renewal_recommendation || '').toLowerCase().replace(/\s+/g, '_');
+          if (renewalFilter === 'renew' && renewal !== 'renew') return false;
+          if (renewalFilter === 'do_not_renew' && renewal !== 'do_not_renew') return false;
+        }
+        
+        return true;
+      });
       
+      // Always include properties, even if search would filter all their tenants
+      // PropertyGroup will handle the search filtering
       if (matchingInsights.length > 0) {
         acc[property] = matchingInsights;
       }
@@ -1383,8 +1490,8 @@ const results = await pollForResults(job_id, accountIdForJob);
           const avgScoreB = insightsB.reduce((sum, i) => sum + i.tenant_score, 0) / insightsB.length;
           return compareValue(avgScoreA, avgScoreB);
         case 'risk':
-    const riskCountA = insightsA.filter(i => (i.turnover_risk || '').toLowerCase() === 'high').length;
-    const riskCountB = insightsB.filter(i => (i.turnover_risk || '').toLowerCase() === 'high').length;
+          const riskCountA = insightsA.filter(i => (i.turnover_risk || '').toLowerCase() === 'high').length;
+          const riskCountB = insightsB.filter(i => (i.turnover_risk || '').toLowerCase() === 'high').length;
           return compareValue(riskCountA, riskCountB);
         case 'delinquency':
           const delinqCountA = insightsA.filter(i => i.high_delinquency_alert).length;
@@ -1418,36 +1525,37 @@ const results = await pollForResults(job_id, accountIdForJob);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="flex flex-wrap gap-4 mb-8">
-        <button
-          onClick={showUploadView}
-          className="px-4 py-2 bg-[#3F6B28] text-white rounded-lg hover:bg-[#345A22] disabled:opacity-50 disabled:hover:bg-[#3F6B28] flex items-center gap-2"
-        >
-          <Upload className="w-5 h-5" />
-          <span>Upload New Files</span>
-        </button>
-        <button
-          onClick={fetchSavedInsights}
-          disabled={loading}
-          className="px-4 py-2 bg-[#3F6B28] text-white rounded-lg hover:bg-[#345A22] disabled:opacity-50 disabled:hover:bg-[#3F6B28] flex items-center gap-2"
-        >
-          <History className="w-5 h-5" />
-          <span>View Saved Insights</span>
-        </button>
-        <button
-          onClick={connectGmail}
-          disabled={gmailConnecting || !user}
-          className="px-4 py-2 bg-[#3F6B28] text-white rounded-lg hover:bg-[#345A22] disabled:opacity-50 flex items-center gap-2"
-        >
-          {gmailConnecting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Users className="w-5 h-5" />}
-          <span>
-            {gmailConnected ? (gmailEmail ? `Gmail Connected (${gmailEmail})` : "Gmail Connected") : "Connect Gmail"}
-          </span>
-        </button>
-      
-        {/* NEW: manual sync trigger for the poller with feedback */}
-        {gmailConnected && (
-          <div className="flex flex-col gap-1">
+      <div className="mb-8">
+        {/* Buttons Row */}
+        <div className="flex flex-wrap gap-4 mb-4">
+          <button
+            onClick={showUploadView}
+            className="px-4 py-2 bg-[#3F6B28] text-white rounded-lg hover:bg-[#345A22] disabled:opacity-50 disabled:hover:bg-[#3F6B28] flex items-center gap-2"
+          >
+            <Upload className="w-5 h-5" />
+            <span>Upload New Files</span>
+          </button>
+          <button
+            onClick={fetchSavedInsights}
+            disabled={loading}
+            className="px-4 py-2 bg-[#3F6B28] text-white rounded-lg hover:bg-[#345A22] disabled:opacity-50 disabled:hover:bg-[#3F6B28] flex items-center gap-2"
+          >
+            <History className="w-5 h-5" />
+            <span>View Saved Insights</span>
+          </button>
+          <button
+            onClick={connectGmail}
+            disabled={gmailConnecting || !user}
+            className="px-4 py-2 bg-[#3F6B28] text-white rounded-lg hover:bg-[#345A22] disabled:opacity-50 flex items-center gap-2"
+          >
+            {gmailConnecting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Users className="w-5 h-5" />}
+            <span>
+              {gmailConnected ? (gmailEmail ? `Gmail Connected (${gmailEmail})` : "Gmail Connected") : "Connect Gmail"}
+            </span>
+          </button>
+        
+          {/* Sync Now Button */}
+          {gmailConnected && (
             <button
               onClick={syncNow}
               disabled={syncing}
@@ -1460,21 +1568,50 @@ const results = await pollForResults(job_id, accountIdForJob);
               <Clock className="w-5 h-5" />
               <span>{syncing ? "Syncing..." : "Sync Now"}</span>
             </button>
-            {syncMessage && (
-              <div className="text-sm text-blue-600 dark:text-blue-400 ml-1">
+          )}
+          
+          {import.meta.env.DEV && (
+            <button
+              onClick={toggleDebugPanel}
+              className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 flex items-center gap-2"
+            >
+              <Bug className="w-5 h-5" />
+              <span>Toggle Debug Panel</span>
+            </button>
+          )}
+        </div>
+
+        {/* Progress Bar - Full Width Under All Buttons */}
+        {syncing && estimatedProgress > 0 && (
+          <div className="w-full bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-base font-medium text-gray-700 dark:text-gray-300">
                 {syncMessage}
-              </div>
-            )}
+              </span>
+              {estimatedTimeRemaining !== null && estimatedTimeRemaining > 0 && (
+                <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                  ~{estimatedTimeRemaining}s remaining
+                </span>
+              )}
+            </div>
+            <div className="w-full h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-2">
+              <div 
+                className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-500 ease-out shadow-sm"
+                style={{ width: `${estimatedProgress}%` }}
+              />
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+              {Math.round(estimatedProgress)}% complete
+            </div>
           </div>
         )}
-        {import.meta.env.DEV && (
-          <button
-            onClick={toggleDebugPanel}
-            className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 flex items-center gap-2"
-          >
-            <Bug className="w-5 h-5" />
-            <span>Toggle Debug Panel</span>
-          </button>
+        
+        {!syncing && syncMessage && (
+          <div className="w-full bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+            <div className="text-sm font-medium text-blue-700 dark:text-blue-300">
+              {syncMessage}
+            </div>
+          </div>
         )}
       </div>
 
@@ -1966,21 +2103,25 @@ const results = await pollForResults(job_id, accountIdForJob);
                       </h2>
                     </div>
           
-                    <div className="flex flex-wrap items-center gap-4">
-                      <div className="flex items-center gap-4 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            onClick={() => handlePropertySort('property')}
-                            className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md whitespace-nowrap"
-                          >
-                            Property {getSortIcon('property', propertySortField, propertySortOrder)}
-                          </button>
-                          <button
-                            onClick={() => handlePropertySort('units')}
-                            className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md whitespace-nowrap"
-                          >
-                            Units {getSortIcon('units', propertySortField, propertySortOrder)}
-                          </button>
+                    {/* Combined Filters & Controls Section */}
+                    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 mb-4 border border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Filters</h3>
+                        <button
+                          onClick={() => {
+                            setRenewalFilter('all');
+                            setPropertySortField('property');
+                            setPropertySortOrder('asc');
+                          }}
+                          className="text-xs text-[#3F6B28] dark:text-green-400 hover:underline"
+                        >
+                          Reset All Filters
+                        </button>
+                      </div>
+                      
+                      {/* Sort & Filter Controls Row */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2">
                           <button
                             onClick={() => handlePropertySort('score')}
                             className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md whitespace-nowrap"
@@ -1999,15 +2140,29 @@ const results = await pollForResults(job_id, accountIdForJob);
                           >
                             Delinquency {getSortIcon('delinquency', propertySortField, propertySortOrder)}
                           </button>
+                          
+                          {/* Renewal Filter */}
+                          <select
+                            value={renewalFilter}
+                            onChange={(e) => setRenewalFilter(e.target.value as any)}
+                            className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-[#3F6B28]"
+                          >
+                            <option value="all">Renewal Status</option>
+                            <option value="renew">Renew</option>
+                            <option value="do_not_renew">Do Not Renew</option>
+                          </select>
                         </div>
           
-                        <div className="flex items-center gap-4 ml-auto">
+                        <div className="flex items-center gap-3 ml-auto">
                           <div className="relative">
                             <input
                               type="text"
                               placeholder="Search unit or tenant..."
                               value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
+                              onChange={(e) => {
+                                console.log("🔍 Dashboard search query changed:", e.target.value);
+                                setSearchQuery(e.target.value);
+                              }}
                               className="pl-10 pr-4 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-[#3F6B28] dark:focus:ring-green-400 w-64"
                             />
                             <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
@@ -2030,32 +2185,37 @@ const results = await pollForResults(job_id, accountIdForJob);
                               <option key={property} value={property}>{property}</option>
                             ))}
                           </select>
+                          
+                          <button
+                            onClick={toggleAllProperties}
+                            className="flex items-center gap-2 px-4 py-1.5 text-[#3F6B28] dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors whitespace-nowrap"
+                          >
+                            {allExpanded ? (
+                              <>
+                                <ChevronUp className="w-5 h-5" />
+                                <span>Collapse All</span>
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown className="w-5 h-5" />
+                                <span>Expand All</span>
+                              </>
+                            )}
+                          </button>
                         </div>
                       </div>
-          
-                      <button
-                        onClick={toggleAllProperties}
-                        className="flex items-center gap-2 px-4 py-1.5 text-[#3F6B28] dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors whitespace-nowrap"
-                      >
-                        {allExpanded ? (
-                          <>
-                            <ChevronUp className="w-5 h-5" />
-                            <span>Collapse All</span>
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown className="w-5 h-5" />
-                            <span>Expand All</span>
-                          </>
-                        )}
-                      </button>
                     </div>
                   </div>
           
                   <div className="space-y-4">
-                    {filterAndSortProperties()
-                      .filter(([property]) => !selectedProperty || property === selectedProperty)
-                      .map(([property, propertyInsights]) => (
+                    {(() => {
+                      const filteredProps = filterAndSortProperties()
+                        .filter(([property]) => !selectedProperty || property === selectedProperty);
+                      
+                      console.log("🔍 Dashboard rendering PropertyGroups with searchQuery:", searchQuery);
+                      console.log("🔍 Number of properties to render:", filteredProps.length);
+                      
+                      return filteredProps.map(([property, propertyInsights]) => (
                         <PropertyGroup
                           key={property}
                           property={property}
@@ -2063,8 +2223,11 @@ const results = await pollForResults(job_id, accountIdForJob);
                           isExpanded={expandedProperties.has(property)}
                           onToggle={() => toggleProperty(property)}
                           searchQuery={searchQuery}
+                          sortField={propertySortField === 'score' || propertySortField === 'risk' || propertySortField === 'delinquency' ? propertySortField : undefined}
+                          sortOrder={propertySortOrder}
                         />
-                      ))}
+                      ));
+                    })()}
                   </div>
                 </div>
               </>

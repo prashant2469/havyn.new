@@ -159,8 +159,12 @@ export function InsightCard({ insight, allInsights = [] }: InsightCardProps) {
   
   console.log("Insight data:", insight);  // Log each individual insight
   console.log("🔍 DEBUG - InsightCard tenant_score:", insight.tenant_score);
-  console.log("🔍 DEBUG - InsightCard score:", insight.score);
   console.log("🔍 DEBUG - InsightCard changes:", insight.changes);
+  console.log("🔍 DETAILED DEBUG - Full insight object:", JSON.stringify(insight, null, 2));
+  console.log("🔍 DETAILED DEBUG - tenant_score type:", typeof insight.tenant_score);
+  console.log("🔍 DETAILED DEBUG - tenant_score value:", insight.tenant_score);
+  console.log("🔍 DETAILED DEBUG - Is tenant_score null?", insight.tenant_score === null);
+  console.log("🔍 DETAILED DEBUG - Is tenant_score undefined?", insight.tenant_score === undefined);
 
   return (
     <>
@@ -186,15 +190,18 @@ export function InsightCard({ insight, allInsights = [] }: InsightCardProps) {
           <div className="flex items-center justify-between mb-4 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
             <span className="text-sm text-gray-600 dark:text-gray-400">Tenant Score</span>
             <div className="flex items-center gap-2">
-              {insight.changes?.score ? (
+              {insight.changes?.tenant_score ? (
                 <ChangeIndicator 
-                  oldValue={insight.changes.score.old}
-                  newValue={insight.changes.score.new}
+                  oldValue={insight.changes?.tenant_score?.old}
+                  newValue={insight.changes?.tenant_score?.new}
                   format="percentage"
                 />
               ) : (
                 <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {typeof insight.score === "number" && !isNaN(insight.score) && insight.score > 0 ? `${insight.score}%` : "No Score"}
+                    {(() => {
+                      const score = insight.tenant_score ?? insight.score;
+                      return typeof score === "number" && !isNaN(score) ? `${score}%` : "No Score";
+                    })()}
                 </span>
               )}
             </div>

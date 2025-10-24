@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { supabase } from "../lib/supabase";
+import { Loader2 } from 'lucide-react';
 
 // Marker icons for landlord properties vs comps
 const landlordIcon = new L.Icon({
@@ -43,9 +44,70 @@ export type Comp = {
   property_type?: string; url?: string; source: string;
 };
 
+export type PropertyMetaMap = Record<string, {
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  defaultBeds?: number;
+  defaultBaths?: number;
+}>;
+
 const usd = (n: number) => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n);
 const toNum = (x:any) => typeof x==='number'?x:typeof x==='string'?Number(x.replace(/[$,]/g,''))||0:0;
 const hasCoords = (lat?:number,lng?:number)=> Number.isFinite(lat)&&Number.isFinite(lng);
+
+// Normalize property name for fuzzy matching
+const normalizePropertyName = (name: string): string => {
+  return name
+    .toLowerCase()
+    .replace(/^the\s+/i, '') // Remove "The" prefix
+    .replace(/\s+/g, ' ') // Normalize spaces
+    .replace(/winston[\s-]salem/gi, 'winston salem') // Normalize Winston-Salem/Winston Salem
+    .trim();
+};
+
+// Find coordinates by fuzzy matching property names
+const findPropertyCoords = (
+  property: string, 
+  propertyLatLng: Record<string, {latitude: number; longitude: number}>
+): {latitude?: number; longitude?: number} => {
+  const normalized = normalizePropertyName(property);
+  
+  // Try exact match first
+  if (propertyLatLng[property]) {
+    return propertyLatLng[property];
+  }
+  
+  // Try fuzzy match
+  for (const [key, value] of Object.entries(propertyLatLng)) {
+    if (normalizePropertyName(key) === normalized) {
+      console.log(`📍 Matched "${property}" to "${key}" via fuzzy matching`);
+      return value;
+    }
+  }
+  
+  return {};
+};
+
+// Clean up duplicate address information
+const cleanAddress = (address: string): string => {
+  // Example: "2716 Ivy Ave, Winston Salem, NC 27105, Winston Salem, NC, 27105"
+  // Should become: "2716 Ivy Ave, Winston Salem, NC 27105"
+  
+  // Split by comma and trim each part
+  const parts = address.split(',').map(s => s.trim());
+  
+  // Remove duplicate city, state, zip at the end
+  // Usually the format is: [street], [city], [state zip], [city], [state], [zip]
+  // We want: [street], [city], [state zip]
+  
+  if (parts.length > 3) {
+    // Keep only the first 3 parts (street, city, state+zip)
+    return parts.slice(0, 3).join(', ');
+  }
+  
+  return address;
+};
 
 function quantiles(nums: number[]) {
   const a = [...nums].sort((x,y)=>x-y);
@@ -64,13 +126,15 @@ async function fetchComps(
   beds?: number,
   baths?: number,
   radiusMiles = 3,
-  limit = 40,
+  limit = 50,
   city?: string,
   state?: string,
   postalCode?: string
 ): Promise<Comp[]> {
   const { data: sessionData } = await supabase.auth.getSession();
   if (!sessionData.session) throw new Error("Please log in to load comps.");
+
+  console.log("🔍 Fetching comps with filters:", { beds, baths, radiusMiles, city, state });
 
   const { data, error } = await supabase.functions.invoke("get-market-comp", {
     body: { lat, lng, beds, baths, radiusMiles, limit, city, state, postalCode },
@@ -84,8 +148,16 @@ async function fetchComps(
   }
 
   const comps: Comp[] = Array.isArray(data?.comps) ? data.comps : [];
-  if (!comps.length) throw new Error("No comps found. Try a larger radius.");
-  return comps;
+  console.log(`✅ Fetched ${comps.length} comps. Rent range: $${Math.min(...comps.map(c=>c.rent))} - $${Math.max(...comps.map(c=>c.rent))}`);
+  
+  // Clean up duplicate address information
+  const cleanedComps = comps.map(comp => ({
+    ...comp,
+    address: cleanAddress(comp.address)
+  }));
+  
+  if (!cleanedComps.length) throw new Error("No comps found. Try a larger radius.");
+  return cleanedComps;
 }
 
 function FitToAll({ coords }:{ coords: Array<[number,number]> }){
@@ -100,10 +172,12 @@ function FitToAll({ coords }:{ coords: Array<[number,number]> }){
 }
 
 export default function LocationInsights({ insights, propertyLatLng, propertyMeta = {}}:{ insights: Insight[]; propertyLatLng: Record<string,{latitude:number;longitude:number}>; propertyMeta?: PropertyMetaMap}){
-  const [radiusMi, setRadiusMi] = useState(3);
+  const [radiusMi, setRadiusMi] = useState(2); // Reduced default radius for faster loading
   const [bedsFilter, setBedsFilter] = useState<number|undefined>(undefined);
   const [bathsFilter, setBathsFilter] = useState<number|undefined>(undefined);
   const [loadingKey, setLoadingKey] = useState<string|null>(null);
+  const [selectedComp, setSelectedComp] = useState<(Comp & { percentile?: number; property?: string }) | null>(null);
+  const [expandedCompLists, setExpandedCompLists] = useState<Set<string>>(new Set());
 
   // make a cache key that includes filters
   const makeCompKey = (property: string) =>
@@ -121,8 +195,33 @@ export default function LocationInsights({ insights, propertyLatLng, propertyMet
     });
   }
   
+  // Toggle expanded comp list for a property
+  const toggleCompList = (property: string) => {
+    setExpandedCompLists(prev => {
+      const next = new Set(prev);
+      if (next.has(property)) {
+        next.delete(property);
+      } else {
+        next.add(property);
+      }
+      return next;
+    });
+  };
+  
+  // Set default beds/baths from the first property's meta
   useEffect(() => {
-    // Clear caches so next “Load Comps” fetch uses the new filters
+    if (bedsFilter === undefined && bathsFilter === undefined) {
+      const firstProperty = Object.keys(propertyMeta)[0];
+      if (firstProperty) {
+        const meta = propertyMeta[firstProperty];
+        if (meta?.defaultBeds) setBedsFilter(meta.defaultBeds);
+        if (meta?.defaultBaths) setBathsFilter(meta.defaultBaths);
+      }
+    }
+  }, [propertyMeta]);
+  
+  useEffect(() => {
+    // Clear caches so next "Load Comps" fetch uses the new filters
     setCompMap({});
     setErrorMap({});
   }, [bedsFilter, bathsFilter, radiusMi]);
@@ -134,10 +233,10 @@ export default function LocationInsights({ insights, propertyLatLng, propertyMet
       (groups[prop] ||= []).push(t);
     }
     return Object.entries(groups).map(([property, tenants])=>{
-      const latLng = propertyLatLng[property];
+      const coords = findPropertyCoords(property, propertyLatLng);
       const firstWithCoords = tenants.find(t=>hasCoords(t.lat,t.lng));
-      const lat = firstWithCoords?.lat ?? latLng?.latitude;
-      const lng = firstWithCoords?.lng ?? latLng?.longitude;
+      const lat = firstWithCoords?.lat ?? coords.latitude;
+      const lng = firstWithCoords?.lng ?? coords.longitude;
       const currentAvgRent = tenants.length ? Math.round( tenants.reduce((s,t)=> s + toNum(t.rent_amount), 0) / tenants.length ) : 0;
         const sumScore = tenants.reduce((s,t)=> s + (Number.isFinite(t.tenant_score)? (t.tenant_score as number) : 0), 0);
       const avgScore = tenants.length ? Math.round((sumScore/tenants.length)*10)/10 : 0;
@@ -157,7 +256,18 @@ export default function LocationInsights({ insights, propertyLatLng, propertyMet
       // Purge any stale caches for this property (different filters)
       purgePropertyComps(property);
   
-      const meta = propertyMeta[property];
+      // Find meta with fuzzy matching
+      let meta = propertyMeta[property];
+      if (!meta) {
+        const normalized = normalizePropertyName(property);
+        for (const [key, value] of Object.entries(propertyMeta)) {
+          if (normalizePropertyName(key) === normalized) {
+            meta = value;
+            console.log(`📍 Matched property meta "${property}" to "${key}"`);
+            break;
+          }
+        }
+      }
       const comps = await fetchComps(
         lat,
         lng,
@@ -210,31 +320,41 @@ export default function LocationInsights({ insights, propertyLatLng, propertyMet
     <div className="space-y-6">
       <div className="flex flex-wrap items-end gap-4 bg-white dark:bg-gray-800 rounded-xl p-4 shadow">
         <div>
-          <label className="block text-xs text-gray-600 mb-1">Radius (miles)</label>
+          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1 font-medium">Radius (miles)</label>
           <input type="number" min={1} max={15} step={0.5} value={radiusMi}
                  onChange={(e)=>setRadiusMi(Number(e.target.value))}
-                 className="border rounded px-2 py-1 w-28"/>
+                 className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-28 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"/>
         </div>
         <div>
-          <label className="block text-xs text-gray-600 mb-1">Beds (optional)</label>
+          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1 font-medium">Bedrooms</label>
           <input type="number" min={0} max={6} step={1} value={bedsFilter ?? ''}
                  onChange={(e)=>setBedsFilter(e.target.value===''? undefined : Number(e.target.value))}
-                 className="border rounded px-2 py-1 w-28"/>
+                 placeholder="Auto"
+                 className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-28 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400"/>
         </div>
         <div>
-          <label className="block text-xs text-gray-600 mb-1">Baths (optional)</label>
+          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1 font-medium">Bathrooms</label>
           <input type="number" min={0} max={6} step={0.5} value={bathsFilter ?? ''}
                  onChange={(e)=>setBathsFilter(e.target.value===''? undefined : Number(e.target.value))}
-                 className="border rounded px-2 py-1 w-28"/>
+                 placeholder="Auto"
+                 className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-28 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400"/>
         </div>
-        <div className="text-xs text-gray-500">Set filters, then click “Load Comps” on each property card.</div>
+        <div className="flex-1 flex items-end">
+          <div className="text-xs text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg border border-blue-200 dark:border-blue-800">
+            <span className="font-medium">💡 Tip:</span> Filters auto-set based on your property. Adjust radius if rents seem high/low.
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {enriched.map((loc)=>{
           const hasLatLng = hasCoords(loc.lat, loc.lng);
+          const hasComps = loc.comps && loc.comps.length > 0;
+          
           return (
-            <div key={loc.property} className="bg-white dark:bg-gray-800 rounded-xl shadow p-5 flex flex-col gap-3">
+            <React.Fragment key={loc.property}>
+              {/* Main Property Card */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-5 flex flex-col gap-3">
               <div className="flex justify-between items-start gap-4">
                 <div className="min-w-0">
                   <h3 className="text-base font-semibold truncate" title={loc.property}>{loc.property}</h3>
@@ -279,12 +399,29 @@ export default function LocationInsights({ insights, propertyLatLng, propertyMet
                 {loc.compCount? (loc.deltaPct>0? `Market +${loc.deltaPct}% vs current avg` : `Market ${loc.deltaPct}% vs current avg`) : 'Load comps to compare'}
               </div>
 
+              {/* Opportunity Alert - shown in main card when comps are loaded */}
+              {loc.deltaPct && loc.deltaPct > 20 && loc.compCount && (
+                <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg">💡</span>
+                    <div className="text-xs text-amber-900 dark:text-amber-100">
+                      <strong>Opportunity:</strong> Market rents are significantly higher. 
+                      Consider raising rents by <strong>{usd((loc.compMedian||0) - (loc.currentAvgRent||0))}/unit</strong> to align with market.
+                      <div className="mt-1 text-amber-700 dark:text-amber-300">
+                        Potential revenue increase: <strong>{usd(((loc.compMedian||0) - (loc.currentAvgRent||0)) * loc.units)}/month</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center gap-3 mt-1">
                 <button
                   disabled={!hasLatLng || loadingKey===loc.property}
                   onClick={()=> hasLatLng && loadCompsFor(loc.property, loc.lat as number, loc.lng as number)}
-                  className={`px-3 py-2 rounded-md text-sm font-medium ${hasLatLng? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-300 text-gray-600 cursor-not-allowed'}`}
+                  className={`px-3 py-2 rounded-md text-sm font-medium flex items-center gap-2 ${hasLatLng? 'bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-75' : 'bg-gray-300 text-gray-600 cursor-not-allowed'}`}
                 >
+                  {loadingKey===loc.property && <Loader2 className="w-4 h-4 animate-spin" />}
                   {loadingKey===loc.property? 'Loading…' : 'Load Comps'}
                 </button>
                 {!hasLatLng && (
@@ -296,20 +433,179 @@ export default function LocationInsights({ insights, propertyLatLng, propertyMet
               </div>
 
               {loc.comps && loc.comps.length>0 && (
-                <div className="mt-2 border-t pt-2 max-h-48 overflow-auto text-sm divide-y">
-                  {loc.comps.slice(0,6).map((c)=> (
-                    <div key={c.id} className="py-2 flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="font-medium truncate" title={c.address}>{c.address}</div>
-                        <div className="text-xs text-gray-500">{[c.beds?`${c.beds}bd`:null, c.baths?`${c.baths}ba`:null, c.distance_mi?`${c.distance_mi.toFixed?.(1)} mi`:null].filter(Boolean).join(' • ')}</div>
-                      </div>
-                      <div className="font-semibold">{usd(c.rent)}</div>
-                    </div>
-                  ))}
-                  {loc.comps.length>6 && <div className="text-xs text-gray-500 py-1">+{loc.comps.length-6} more…</div>}
+                <div className="mt-2 border-t pt-2 max-h-96 overflow-auto text-sm divide-y">
+                  {(() => {
+                    // Sort comps by rent (lowest to highest)
+                    const sortedComps = [...loc.comps].sort((a, b) => a.rent - b.rent);
+                    const isExpanded = expandedCompLists.has(loc.property);
+                    const displayLimit = isExpanded ? sortedComps.length : 6;
+                    const displayedComps = sortedComps.slice(0, displayLimit);
+                    
+                    return (
+                      <>
+                        {displayedComps.map((c)=> {
+                          // Calculate percentile for this comp
+                          const rents = sortedComps.map(comp => comp.rent).sort((a,b) => a-b);
+                          const position = rents.indexOf(c.rent);
+                          const percentile = Math.round((position / (rents.length - 1)) * 100);
+                          
+                          return (
+                            <div 
+                              key={c.id} 
+                              className="py-2 flex items-center justify-between gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors rounded px-2 -mx-2"
+                              onClick={() => setSelectedComp({ ...c, percentile, property: loc.property })}
+                            >
+                              <div className="min-w-0">
+                                <div className="font-medium truncate" title={c.address}>{c.address}</div>
+                                <div className="text-xs text-gray-500">{[c.beds?`${c.beds}bd`:null, c.baths?`${c.baths}ba`:null, c.distance_mi?`${c.distance_mi.toFixed?.(1)} mi`:null].filter(Boolean).join(' • ')}</div>
+                              </div>
+                              <div className="font-semibold">{usd(c.rent)}</div>
+                            </div>
+                          );
+                        })}
+                        {sortedComps.length > 6 && (
+                          <div 
+                            className="text-xs text-blue-600 dark:text-blue-400 py-2 cursor-pointer hover:text-blue-700 dark:hover:text-blue-300 font-medium flex items-center gap-1"
+                            onClick={() => toggleCompList(loc.property)}
+                          >
+                            {isExpanded ? (
+                              <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                </svg>
+                                Show less
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                                Show {sortedComps.length - 6} more
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               )}
             </div>
+            
+            {/* Comp Detail Card - Shows on the right when a comp is clicked */}
+            {selectedComp && selectedComp.property === loc.property && (
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border-2 border-indigo-500 dark:border-indigo-600 overflow-hidden">
+                {/* Header with close button */}
+                <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4 flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-white">Property Details</h3>
+                  <button 
+                    onClick={() => setSelectedComp(null)}
+                    className="text-white hover:text-gray-200 transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="p-6 space-y-4">
+                  {/* Address and Bed/Bath */}
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{selectedComp.address}</h4>
+                    <div className="flex items-center gap-4 text-sm">
+                      {selectedComp.beds && (
+                        <div className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                          </svg>
+                          <span className="font-medium">{selectedComp.beds} Bedroom{selectedComp.beds !== 1 ? 's' : ''}</span>
+                        </div>
+                      )}
+                      {selectedComp.baths && (
+                        <div className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
+                          </svg>
+                          <span className="font-medium">{selectedComp.baths} Bathroom{selectedComp.baths !== 1 ? 's' : ''}</span>
+                        </div>
+                      )}
+                    </div>
+                    {selectedComp.property_type && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 capitalize mt-2">{selectedComp.property_type}</p>
+                    )}
+                  </div>
+
+                  {/* Rent Amount - Large Display */}
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
+                    <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Monthly Rent</div>
+                    <div className="text-4xl font-extrabold text-green-600 dark:text-green-400">{usd(selectedComp.rent)}</div>
+                    {selectedComp.percentile !== undefined && (
+                      <div className="mt-3 flex items-center gap-2">
+                        <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                          <div 
+                            className="bg-gradient-to-r from-green-500 to-emerald-500 h-full transition-all duration-500"
+                            style={{ width: `${selectedComp.percentile}%` }}
+                          />
+                        </div>
+                        <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                          {selectedComp.percentile}th percentile
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Property Details Grid */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {selectedComp.beds && (
+                      <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Bedrooms</div>
+                        <div className="text-2xl font-bold text-gray-900 dark:text-white">{selectedComp.beds}</div>
+                      </div>
+                    )}
+                    {selectedComp.baths && (
+                      <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Bathrooms</div>
+                        <div className="text-2xl font-bold text-gray-900 dark:text-white">{selectedComp.baths}</div>
+                      </div>
+                    )}
+                    {selectedComp.sqft && (
+                      <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Square Feet</div>
+                        <div className="text-xl font-bold text-gray-900 dark:text-white">{selectedComp.sqft.toLocaleString()}</div>
+                      </div>
+                    )}
+                    {selectedComp.distance_mi && (
+                      <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Distance</div>
+                        <div className="text-xl font-bold text-gray-900 dark:text-white">{selectedComp.distance_mi.toFixed(1)} mi</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Source and Link */}
+                  <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Data Source</div>
+                      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">{selectedComp.source}</div>
+                    </div>
+                    {selectedComp.url && (
+                      <a 
+                        href={selectedComp.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium text-sm transition-colors flex items-center gap-2"
+                      >
+                        View Listing
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </React.Fragment>
           );
         })}
       </div>
@@ -331,32 +627,45 @@ export default function LocationInsights({ insights, propertyLatLng, propertyMet
             </Marker>
           ))}
 
-          {Object.entries(compMap).flatMap(([prop, list]) =>
-            list.map((c) => (
-              <Marker key={`comp-${prop}-${c.id}`} position={[c.lat, c.lng]} icon={compIcon}>
-                <Popup>
-                  <b>{c.address}</b>
-                  <br />
-                  {[c.beds ? `${c.beds}bd` : null, c.baths ? `${c.baths}ba` : null, c.sqft ? `${c.sqft} sqft` : null]
-                    .filter(Boolean)
-                    .join(' • ')}
-                  <br />
-                  Rent: {usd(c.rent)}
-                  {c.distance_mi ? ` • ${c.distance_mi.toFixed?.(1)} mi` : ''}
-                  <br />
-                  Source: {c.source}
-                  {c.url ? (
-                    <>
-                      {' '}
-                      •{' '}
-                      <a href={c.url} target="_blank" rel="noreferrer">
-                        View
-                      </a>
-                    </>
-                  ) : null}
-                </Popup>
-              </Marker>
-            ))
+          {Object.entries(compMap).flatMap(([compProperty, list]) =>
+            list.map((c) => {
+              // Calculate percentile for this comp
+              const rents = list.map(comp => comp.rent).sort((a,b) => a-b);
+              const position = rents.indexOf(c.rent);
+              const percentile = Math.round((position / (rents.length - 1)) * 100);
+              
+              // Find the actual property name from enriched summaries
+              const actualProperty = enriched.find(e => {
+                const compKey = makeCompKey(e.property);
+                return compKey === compProperty;
+              })?.property || compProperty.split('|')[0];
+              
+              return (
+                <Marker 
+                  key={`comp-${compProperty}-${c.id}`} 
+                  position={[c.lat, c.lng]} 
+                  icon={compIcon}
+                  eventHandlers={{
+                    click: () => setSelectedComp({ ...c, percentile, property: actualProperty })
+                  }}
+                >
+                  <Popup>
+                    <div className="cursor-pointer" onClick={() => setSelectedComp({ ...c, percentile, property: actualProperty })}>
+                      <b>{c.address}</b>
+                      <br />
+                      {[c.beds ? `${c.beds}bd` : null, c.baths ? `${c.baths}ba` : null, c.sqft ? `${c.sqft} sqft` : null]
+                        .filter(Boolean)
+                        .join(' • ')}
+                      <br />
+                      Rent: {usd(c.rent)}
+                      {c.distance_mi ? ` • ${c.distance_mi.toFixed?.(1)} mi` : ''}
+                      <br />
+                      <span className="text-xs text-blue-600 underline">Click for details</span>
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })
           )}
         </MapContainer>
       </div>

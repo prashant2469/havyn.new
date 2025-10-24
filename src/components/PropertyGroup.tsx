@@ -11,9 +11,20 @@ interface PropertyGroupProps {
   onToggle: () => void;
   allInsights?: TenantInsight[];
   searchQuery?: string;
+  sortField?: 'score' | 'risk' | 'delinquency';
+  sortOrder?: 'asc' | 'desc';
 }
 
-export function PropertyGroup({ property, insights, isExpanded, onToggle, allInsights = [], searchQuery = '' }: PropertyGroupProps) {
+export function PropertyGroup({ 
+  property, 
+  insights, 
+  isExpanded, 
+  onToggle, 
+  allInsights = [], 
+  searchQuery = '',
+  sortField,
+  sortOrder = 'asc'
+}: PropertyGroupProps) {
   const calculateStats = () => {
     const stats = {
       totalUnits: insights.length,
@@ -22,7 +33,7 @@ export function PropertyGroup({ property, insights, isExpanded, onToggle, allIns
       rentIncreaseOpportunities: insights.filter(i => i.raise_rent_opportunity).length,
       delinquencyAlerts: insights.filter(i => i.high_delinquency_alert).length,
       averageScore: Math.round(
-        insights.reduce((sum, insight) => sum + insight.score, 0) / insights.length
+        insights.reduce((sum, insight) => sum + (insight.tenant_score || 0), 0) / insights.length
       ),
     };
 
@@ -46,14 +57,54 @@ export function PropertyGroup({ property, insights, isExpanded, onToggle, allIns
 
   const stats = calculateStats();
 
-  const filteredInsights = searchQuery
-    ? insights.filter(insight => 
-        (insight.tenant_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (insight.unit || '').toLowerCase().includes(searchQuery.toLowerCase())
-      )
+  // Filter by search query
+  let filteredInsights = searchQuery && searchQuery.trim()
+    ? insights.filter(insight => {
+        const searchLower = searchQuery.toLowerCase().trim();
+        const tenantNameMatch = (insight.tenant_name || '').toLowerCase().includes(searchLower);
+        const unitMatch = (insight.unit || '').toLowerCase().includes(searchLower);
+        
+        // Also match against "Unit [number]" format as it appears in the UI
+        const unitDisplayText = `unit ${insight.unit || ''}`.toLowerCase();
+        const unitDisplayMatch = unitDisplayText.includes(searchLower);
+        
+        const matches = tenantNameMatch || unitMatch || unitDisplayMatch;
+        
+        // Debug search
+        if (searchQuery && searchQuery.length > 0) {
+          console.log(`🔍 Search "${searchQuery}" - Tenant: "${insight.tenant_name}", Unit: "${insight.unit}", Display: "${unitDisplayText}", Match: ${matches}`);
+        }
+        
+        return matches;
+      })
     : insights;
   
-  console.log("Property insights:", insights);  // Add this to see what's being passed
+  // Sort insights within this property
+  if (sortField) {
+    filteredInsights = [...filteredInsights].sort((a, b) => {
+      let compareValue = 0;
+      
+      if (sortField === 'score') {
+        const scoreA = a.tenant_score || 0;
+        const scoreB = b.tenant_score || 0;
+        compareValue = scoreA - scoreB;
+      } else if (sortField === 'risk') {
+        const riskOrder = { high: 3, medium: 2, low: 1 };
+        const riskA = riskOrder[(a.turnover_risk || 'low').toLowerCase() as keyof typeof riskOrder] || 0;
+        const riskB = riskOrder[(b.turnover_risk || 'low').toLowerCase() as keyof typeof riskOrder] || 0;
+        compareValue = riskA - riskB;
+      } else if (sortField === 'delinquency') {
+        const riskOrder = { high: 3, medium: 2, low: 1 };
+        const delA = riskOrder[(a.predicted_delinquency || 'low').toLowerCase() as keyof typeof riskOrder] || 0;
+        const delB = riskOrder[(b.predicted_delinquency || 'low').toLowerCase() as keyof typeof riskOrder] || 0;
+        compareValue = delA - delB;
+      }
+      
+      return sortOrder === 'desc' ? -compareValue : compareValue;
+    });
+  }
+  
+  console.log(`🏢 Property "${property}" - Total: ${insights.length}, After search: ${filteredInsights.length}, Search query: "${searchQuery}"`);
 
   return (
     <div className="mb-4 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
