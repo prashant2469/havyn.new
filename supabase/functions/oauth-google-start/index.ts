@@ -18,9 +18,8 @@ Deno.serve(async (req) => {
       throw new Error('User ID is required');
     }
 
-    // Get your domain from environment or construct it
-    const siteUrl = Deno.env.get('SITE_URL') || 'http://localhost:5173';
-    const redirectUri = `${siteUrl}/oauth/google/callback`;
+    // Get redirect URI from environment or use default
+    const redirectUri = Deno.env.get('GOOGLE_REDIRECT_URI') || 'http://localhost:5174/oauth/google/callback';
     
     // Get Google OAuth credentials from environment
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
@@ -35,7 +34,7 @@ Deno.serve(async (req) => {
     googleAuthUrl.searchParams.set('client_id', clientId);
     googleAuthUrl.searchParams.set('redirect_uri', redirectUri);
     googleAuthUrl.searchParams.set('response_type', 'code');
-    googleAuthUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/gmail.readonly');
+    googleAuthUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email');
     googleAuthUrl.searchParams.set('access_type', 'offline');
     googleAuthUrl.searchParams.set('state', uid);
     googleAuthUrl.searchParams.set('prompt', 'consent');

@@ -18,29 +18,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) {
-        console.error('Session error:', error);
-        // If refresh token is invalid, clear the session
-        if (error.message?.includes('refresh') || error.message?.includes('Refresh Token')) {
-          console.log('Invalid refresh token detected. Clearing session...');
-          supabase.auth.signOut();
-        }
-      }
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
     // Listen for changes on auth state
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // Handle token refresh errors
-      if (event === 'TOKEN_REFRESHED') {
-        console.log('Token refreshed successfully');
-      } else if (event === 'SIGNED_OUT') {
-        console.log('User signed out');
-        setUser(null);
-      }
-      
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       setLoading(false);
     });

@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
     console.log('Environment variables check:', {
       hasClientId: !!Deno.env.get('GOOGLE_CLIENT_ID'),
       hasClientSecret: !!Deno.env.get('GOOGLE_CLIENT_SECRET'),
-      siteUrl: Deno.env.get('SITE_URL')
+      redirectUri: Deno.env.get('GOOGLE_REDIRECT_URI')
     });
     
     if (!code) {
@@ -32,8 +32,7 @@ Deno.serve(async (req) => {
     // Get Google OAuth credentials from environment
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
     const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
-    const siteUrl = Deno.env.get('SITE_URL') || 'http://localhost:5173';
-    const redirectUri = `${siteUrl}/oauth/google/callback`;
+    const redirectUri = Deno.env.get('GOOGLE_REDIRECT_URI') || 'http://localhost:5174/oauth/google/callback';
     
     if (!clientId || !clientSecret) {
       throw new Error('Google OAuth credentials not configured');
@@ -42,7 +41,7 @@ Deno.serve(async (req) => {
     // Add debug logging before token exchange
     console.log('About to exchange code for token with:', {
       clientId: clientId,
-      redirectUri: `${siteUrl}/oauth/google/callback`,
+      redirectUri: redirectUri,
       code: code.substring(0, 10) + '...' // Log partial code for security
     });
     
@@ -82,8 +81,13 @@ Deno.serve(async (req) => {
       },
     });
 
+    console.log('User info response status:', userInfoResponse.status);
+    console.log('User info response headers:', Object.fromEntries(userInfoResponse.headers.entries()));
+
     if (!userInfoResponse.ok) {
-      throw new Error('Failed to get user info from Google');
+      const errorText = await userInfoResponse.text();
+      console.error('User info request failed:', errorText);
+      throw new Error(`Failed to get user info from Google: ${errorText}`);
     }
 
     const userInfo = await userInfoResponse.json();
@@ -130,9 +134,14 @@ Deno.serve(async (req) => {
     
   } catch (error) {
     console.error('OAuth callback error:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', JSON.stringify(error, null, 2));
+    
     return new Response(JSON.stringify({
       ok: false,
-      error: error.message
+      error: error.message || 'Unknown error',
+      details: error.toString(),
+      type: error.name || 'Error'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

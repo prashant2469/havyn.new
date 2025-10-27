@@ -221,24 +221,18 @@ const connectGmail = async () => {
       throw new Error("Popup blocked. Please allow popups for this site.");
     }
 
-    // Listen for popup completion
-    const checkClosed = setInterval(() => {
-      if (popup.closed) {
-        clearInterval(checkClosed);
-        setGmailConnecting(false);
-        
-        // Check if Gmail was successfully connected
-        checkGmailStatus();
-      }
-    }, 1000);
-
-    // Listen for message from popup
+    // Listen for popup completion using message event instead of checking popup.closed
+    // This avoids COOP (Cross-Origin-Opener-Policy) issues
+    let checkClosedInterval: NodeJS.Timeout | null = null;
+    
     const messageHandler = (event: MessageEvent) => {
+      // Security: Verify message origin
       if (event.origin !== window.location.origin) return;
       
-      if (event.data.type === 'GMAIL_CONNECTED') {
-        clearInterval(checkClosed);
-        popup.close();
+      // Handle different message types
+      if (event.data?.type === 'GMAIL_CONNECTED') {
+        if (checkClosedInterval) clearInterval(checkClosedInterval);
+        // ✅ Let the popup close itself to avoid COOP errors
         window.removeEventListener('message', messageHandler);
         
         setGmailConnected(true);
@@ -247,17 +241,46 @@ const connectGmail = async () => {
         
         // Generate insights after Gmail connection
         generateInsightsAfterGmailConnection();
-      } else if (event.data.type === 'GMAIL_ERROR') {
-        clearInterval(checkClosed);
-        popup.close();
+      } else if (event.data?.type === 'GMAIL_ERROR') {
+        if (checkClosedInterval) clearInterval(checkClosedInterval);
+        // ✅ Let the popup close itself to avoid COOP errors
         window.removeEventListener('message', messageHandler);
         
         setError(event.data.error || 'Gmail connection failed');
         setGmailConnecting(false);
+      } else if (event.data?.type === 'gmail-oauth-complete') {
+        // Legacy support - just check status
+        if (checkClosedInterval) clearInterval(checkClosedInterval);
+        window.removeEventListener('message', messageHandler);
+        setGmailConnecting(false);
+        checkGmailStatus();
       }
     };
-
+    
     window.addEventListener('message', messageHandler);
+    
+    // Fallback: Try checking popup.closed but wrap in try-catch to suppress COOP warnings
+    checkClosedInterval = setInterval(() => {
+      try {
+        if (popup.closed) {
+          clearInterval(checkClosedInterval!);
+          window.removeEventListener('message', messageHandler);
+          setGmailConnecting(false);
+          checkGmailStatus();
+        }
+      } catch (e) {
+        // Suppress COOP errors - they're expected and harmless
+      }
+    }, 1000);
+    
+    // Cleanup after 2 minutes
+    setTimeout(() => {
+      if (checkClosedInterval) clearInterval(checkClosedInterval);
+      window.removeEventListener('message', messageHandler);
+      setGmailConnecting(false);
+      checkGmailStatus();
+    }, 120000);
+
 
   } catch (e: any) {
     console.error(e);
@@ -276,6 +299,9 @@ const checkGmailStatus = async () => {
 
     if (error) {
       console.error("gmail-status error:", error);
+      // Don't throw on error - just assume not connected
+      setGmailConnected(false);
+      setGmailEmail(null);
       return;
     }
 
@@ -288,6 +314,9 @@ const checkGmailStatus = async () => {
     }
   } catch (e) {
     console.error("gmail-status failed:", e);
+    // Don't throw on error - just assume not connected
+    setGmailConnected(false);
+    setGmailEmail(null);
   }
 };
 
@@ -300,18 +329,18 @@ const startInsightPolling = () => {
   
   const startTime = Date.now();
   
-  // Estimate: ~250 tenants, ~30 sec avg processing time
+  // Estimate: ~150 tenants, ~3 min avg processing time (based on actual Lambda logs)
   // Progress simulation: logarithmic curve to feel natural
   const progressInterval = setInterval(() => {
     const elapsed = (Date.now() - startTime) / 1000; // seconds
     
     // Logarithmic progress: fast at first, slows down near completion
-    // Reaches ~90% at 30 seconds, never hits 100% until real data arrives
-    const progress = Math.min(90, Math.log(elapsed + 1) * 25);
+    // Reaches ~90% at 180 seconds (3 min), never hits 100% until real data arrives
+    const progress = Math.min(90, Math.log(elapsed + 1) * 17);
     setEstimatedProgress(progress);
     
-    // Estimate time remaining (simple linear interpolation)
-    const estimatedTotal = 30; // 30 seconds average
+    // Estimate time remaining based on actual processing time
+    const estimatedTotal = 180; // 3 minutes average (based on Lambda logs)
     const remaining = Math.max(0, estimatedTotal - elapsed);
     setEstimatedTimeRemaining(Math.ceil(remaining));
   }, 500);
@@ -412,22 +441,34 @@ const startInsightPolling = () => {
         console.log("📍 DEBUG - Unique property names in your data:", uniqueProperties);
         console.log("📍 DEBUG - You need to add these property names to propertyLatLng in Dashboard.tsx");
         
+        // Calculate job summary by comparing with existing insights
+        const existingTenantKeys = new Set(insights.map(i => 
+          `${i.property}-${i.unit}-${i.tenant_name}`.toLowerCase()
+        ));
+        
+        let newCount = 0;
+        let unchangedCount = 0;
+        
+        formatted.forEach((insight: any) => {
+          const key = `${insight.property}-${insight.unit}-${insight.tenant_name}`.toLowerCase();
+          if (existingTenantKeys.has(key)) {
+            unchangedCount++;
+          } else {
+            newCount++;
+          }
+        });
+        
         setInsights(formatted);
         setEstimatedProgress(100);
         setSyncMessage("✅ Insights loaded successfully!");
         setSyncing(false);
         
-        // Mark that user has synced successfully (for future page loads)
-        if (user?.id) {
-          localStorage.setItem(`hasSync_${user.id}`, 'true');
-        }
-        
-        // Calculate job summary
+        // Set accurate job summary
         setJobSummary({
           total: data.length,
-          new: 0, // No change_type column in tenant_insights
-          changed: 0, // No change_type column in tenant_insights
-          unchanged: data.length, // All insights are current
+          new: newCount,
+          changed: 0, // We don't track changes between syncs yet
+          unchanged: unchangedCount,
         });
         
         console.log("✅ Insights loaded from Supabase:", formatted.length);
@@ -444,7 +485,7 @@ const startInsightPolling = () => {
       }
 
       // No insights yet, continue polling
-      setSyncMessage(`Processing tenants... (${Math.round(estimatedProgress)}% complete)`);
+      setSyncMessage("Processing tenants...");
       
     } catch (error) {
       console.error("Error in insight polling:", error);
@@ -538,17 +579,9 @@ useEffect(() => {
   })();
 }, [user?.id]);
 
-// ✅ Load insights on page load - ONLY if user has synced before
+// ✅ Load insights on page load - DON'T show them until after sync
 useEffect(() => {
   if (!user?.id) return;
-
-  // Check if user has ever synced (stored in localStorage)
-  const hasEverSynced = localStorage.getItem(`hasSync_${user.id}`) === 'true';
-  
-  if (!hasEverSynced) {
-    console.log("⚠️ User has never synced. Not loading insights on page load.");
-    return;
-  }
 
   console.log("Loading insights on page load for user:", user.id);
 
@@ -1603,7 +1636,7 @@ const results = await pollForResults(job_id, accountIdForJob);
               </span>
               {estimatedTimeRemaining !== null && estimatedTimeRemaining > 0 && (
                 <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-                  ~{estimatedTimeRemaining}s remaining
+                  ~{Math.floor(estimatedTimeRemaining / 60)}m {estimatedTimeRemaining % 60}s remaining
                 </span>
               )}
             </div>

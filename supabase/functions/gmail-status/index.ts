@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
       .from('gmail_connections')
       .select('email, expires_at, created_at')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
       console.error('Error checking Gmail status:', error);
