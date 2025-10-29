@@ -324,23 +324,57 @@ const startInsightPolling = () => {
   if (!user?.id) return;
 
   console.log("Starting insight polling...");
-  setSyncMessage("Processing your data...");
-  setEstimatedProgress(0);
+  setSyncMessage("Checking for new data...");
+  setEstimatedProgress(5);
   
   const startTime = Date.now();
+  let hasDetectedJob = false;
+  let noNewDataTimeout: NodeJS.Timeout | null = null;
   
-  // Estimate: ~150 tenants, ~3 min avg processing time (based on actual Lambda logs)
-  // Progress simulation: logarithmic curve to feel natural
+  // Set a timeout to detect "no new data" scenario
+  noNewDataTimeout = setTimeout(() => {
+    if (!hasDetectedJob) {
+      console.log("⏰ No new data detected after 30 seconds");
+      clearInterval(progressInterval);
+      setEstimatedProgress(100);
+      setSyncMessage("✅ No new data since last sync");
+      setSyncing(false);
+      setSyncStarted(false);
+    }
+  }, 30000); // 30 seconds timeout
+  
+  // Linear progress based on actual backend stages
   const progressInterval = setInterval(() => {
     const elapsed = (Date.now() - startTime) / 1000; // seconds
     
-    // Logarithmic progress: fast at first, slows down near completion
-    // Reaches ~90% at 180 seconds (3 min), never hits 100% until real data arrives
-    const progress = Math.min(90, Math.log(elapsed + 1) * 17);
-    setEstimatedProgress(progress);
+    // Stage-based linear progress determined by elapsed time
+    let progress = 0;
+    let message = '';
+    let estimatedTotal = 180; // Default 3 minutes
     
-    // Estimate time remaining based on actual processing time
-    const estimatedTotal = 180; // 3 minutes average (based on Lambda logs)
+    if (elapsed <= 15) {
+      // 0-20%: Gmail polling (first 15 seconds)
+      progress = Math.min(20, (elapsed / 15) * 20);
+      message = "Checking for new emails...";
+    } else if (elapsed <= 30) {
+      // 20-40%: Normalization (15-30 seconds)
+      progress = 20 + Math.min(20, ((elapsed - 15) / 15) * 20);
+      message = "Processing CSV data...";
+    } else if (elapsed <= 45) {
+      // 40-60%: Delta detection (30-45 seconds)
+      progress = 40 + Math.min(20, ((elapsed - 30) / 15) * 20);
+      message = "Detecting changes...";
+    } else {
+      // 60-95%: AI processing (45-180 seconds)
+      progress = 60 + Math.min(35, ((elapsed - 45) / 135) * 35);
+      message = "Generating AI insights...";
+      estimatedTotal = 180;
+    }
+    
+    setEstimatedProgress(progress);
+    setSyncMessage(message);
+    
+    // Update time remaining
     const remaining = Math.max(0, estimatedTotal - elapsed);
     setEstimatedTimeRemaining(Math.ceil(remaining));
   }, 500);
@@ -424,6 +458,11 @@ const startInsightPolling = () => {
 
       if (data && data.length > 0) {
         // Found insights! Update the UI
+        hasDetectedJob = true;
+        if (noNewDataTimeout) {
+          clearTimeout(noNewDataTimeout);
+        }
+        
         const formatted = data.map((i: any) => ({
           ...i,
           // Keep tenant_score as is - InsightCard will use tenant_score directly
@@ -500,6 +539,9 @@ const startInsightPolling = () => {
   return () => {
     clearInterval(pollInterval);
     clearInterval(progressInterval);
+    if (noNewDataTimeout) {
+      clearTimeout(noNewDataTimeout);
+    }
   };
 };
 
