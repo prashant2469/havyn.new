@@ -17,6 +17,21 @@ interface NotificationPayload {
   phone?: string;
 }
 
+const SMS_COMPLIANCE_FOOTER =
+  '\n\nBy replying, you consent to receive SMS messages from Havyn. Reply STOP to opt out. Reply HELP for help. Msg & data rates may apply.';
+
+const buildSmsBody = (message: string): string => {
+  const trimmed = message.trim();
+  // Avoid duplicating compliance copy if caller already included it.
+  if (
+    /reply\s+stop/i.test(trimmed) &&
+    /reply\s+help/i.test(trimmed)
+  ) {
+    return trimmed;
+  }
+  return `${trimmed}${SMS_COMPLIANCE_FOOTER}`;
+};
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -64,7 +79,7 @@ Deno.serve(async (req) => {
     if ((type === 'sms' || type === 'both') && phone) {
       try {
         results.sms = await twilioClient.messages.create({
-          body: message,
+          body: buildSmsBody(message),
           to: phone.replace(/-/g, ''),  // Remove dashes from phone number
           from: '+18339293855',  // Replace with your Twilio phone number
         });
