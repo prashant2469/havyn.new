@@ -23,10 +23,12 @@ export function LandingPage() {
     email: '',
     phone: '',
     company: '',
-    propertyType: ''
+    propertyType: '',
+    smsConsent: false
   });
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [submitSuccess, setSubmitSuccess] = React.useState(false);
+  const [formError, setFormError] = React.useState<string | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -36,8 +38,23 @@ export function LandingPage() {
     }));
   };
 
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: checked
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+
+    if (!formData.smsConsent) {
+      setFormError('Please agree to SMS consent to continue.');
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
@@ -63,6 +80,7 @@ export function LandingPage() {
           email: formData.email,
           name: `${formData.firstName} ${formData.lastName}`,
           phone: formData.phone,
+          smsConsent: formData.smsConsent,
           company: formData.company,
           propertyType: formData.propertyType,
           message: `Demo request from ${formData.firstName} ${formData.lastName} at ${formData.company}. Property type: ${formData.propertyType}. Phone: ${formData.phone}.`
@@ -92,7 +110,8 @@ export function LandingPage() {
         email: '',
         phone: '',
         company: '',
-        propertyType: ''
+        propertyType: '',
+        smsConsent: false
       });
     }, 3000);
   };
@@ -509,6 +528,24 @@ export function LandingPage() {
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-havyn-primary focus:border-havyn-primary"
                       placeholder="(555) 123-4567"
                     />
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      By providing your phone number, you agree to receive SMS messages from Havyn about your demo request and product follow-up.
+                      Reply STOP to opt out and HELP for help. Message frequency varies. Message and data rates may apply.
+                    </p>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <input
+                      id="smsConsent"
+                      name="smsConsent"
+                      type="checkbox"
+                      checked={formData.smsConsent}
+                      onChange={handleCheckboxChange}
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-havyn-primary focus:ring-havyn-primary"
+                    />
+                    <label htmlFor="smsConsent" className="text-xs text-gray-600 dark:text-gray-300 leading-5">
+                      I consent to receive SMS messages from Havyn for demo scheduling and product updates. I understand consent is not a condition of purchase.
+                    </label>
                   </div>
 
                   <div>
@@ -554,6 +591,11 @@ export function LandingPage() {
             {!submitSuccess && (
               <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
                 <form onSubmit={handleSubmit}>
+                  {formError && (
+                    <p className="mb-3 text-xs text-red-600 dark:text-red-400 text-center">
+                      {formError}
+                    </p>
+                  )}
                   <button
                     type="submit"
                     disabled={isSubmitting}
